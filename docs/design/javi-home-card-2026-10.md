@@ -1,5 +1,7 @@
 # Javi card on Home; Calendar without the weather (2026-10)
 
+> Note 2026-11-05: the Pro wording below is history. Since [ADR 0002](../adr/0002-free-for-everyone.md) Burrow is free for everyone: the card shows today's briefing whenever one exists, with no Pro condition.
+
 Owner request: "javi dm pill shouldnt show in overview and settings. javi should have its own card for summarized insight in overview." Then: "separate calendar from weather. weather should only be shown via javi card in overview". Base: `origin/main` ea4baa5. No Free or Pro change, no new route, no new network feature or host, no migration, no new model call path.
 
 ## 1. Where Javi shows

@@ -1,6 +1,6 @@
 // Javi inbox: code-derived "new for you" items behind the launcher count. The app_state row `javi.inbox`
 // holds read markers only (keys and timestamps, no content). Items are derived on every read: a page whose
-// data changed since its last insight (the write observer below), today's briefing (Pro) and finished folder
+// data changed since its last insight (the write observer below), today's briefing and finished folder
 // summaries. `unseen` lists the pages never opened in Javi or changed since, for the current-page notice
 // (owner decision 2026-10-10: every write counts, also the user's own edit on the page on screen). Code
 // only: this module never calls a model and imports nothing from the AI layer.
@@ -10,7 +10,6 @@
 import { selectOne, upsert, withTransaction } from '../db/index.js';
 import { onTableWrite } from '../db/writeEvents.js';
 import { captureDataGeneration, onDataReset } from '../dataGeneration.js';
-import { proAccess } from '../pro.js';
 import { countSummariesSince } from '../folders/store.js';
 import { JAVI_PAGE_LABELS, JAVI_PAGE_PATHS } from './pages.js';
 
@@ -103,7 +102,6 @@ export function readInbox({ now = defaultNow } = {}) {
 }
 
 function briefingItem(state, nowMs) {
-  if (!proAccess('briefings').allowed) return null;
   const b = selectOne('app_state', { columns: ['value'], where: { key: BRIEFING_STATE_KEY } })?.value;
   const at = isPlainObject(b) ? iso(b.generatedAt) : null;
   if (!at || Date.parse(at) > nowMs) return null;
@@ -153,7 +151,7 @@ const unseenFor = (state) =>
     return !e || (e.changedAt !== null && e.changedAt > e.seenAt);
   });
 
-/** Unread items, Pro-filtered, future timestamps dropped, sorted by at desc. Never writes. */
+/** Unread items, future timestamps dropped, sorted by at desc. Never writes. */
 export function listInboxItems({ now = defaultNow } = {}) {
   const n = now();
   return itemsFor(normalizeInbox(readRow()?.value, n), n);

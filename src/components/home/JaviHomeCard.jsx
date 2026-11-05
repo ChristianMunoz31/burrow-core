@@ -11,11 +11,11 @@ import {
 import { BriefingMessage } from '../../extensions/proExtensions';
 import { usePageContextReader } from '../../contexts/PageContextContext';
 import { useJaviSession } from '../../hooks/useJaviSession';
-import { useCachedJarvisAi } from '../../hooks/useCachedJarvisAi';
+import { useJarvisStatus } from '../../hooks/useJarvisStatus';
 import { isBriefingToday, useBriefing } from '../../hooks/useBriefing';
-import { isKnownFree, useEntitlements } from '../../hooks/useEntitlements';
 import { useNetworkFeature } from '../../hooks/useNetworkFeature';
 import { useWeather } from '../../hooks/useWeather';
+import { isAiUnavailableError } from '../../utils/apiError';
 
 const PAGE = 'home';
 const LINK_CLASS =
@@ -69,7 +69,16 @@ function WeatherSlot() {
 }
 
 /** One page insight for Home, provided automatically on load without prompting, through the advice session. */
-function HomeInsight({ thread, retry, loading }) {
+function HomeInsight({ thread, retry, loading, unavailable }) {
+  if (unavailable) {
+    return (
+      <AdviceErrorRow
+        error={{ message: unavailable.message, code: unavailable.code, reason: unavailable.reason }}
+        canRetry={false}
+        onRetry={() => {}}
+      />
+    );
+  }
   const reply = thread.messages.findLast((m) => m.role === 'assistant') ?? null;
 
   return (
@@ -104,18 +113,21 @@ function HomeInsight({ thread, retry, loading }) {
 export default function JaviHomeCard({ dimmed = false }) {
   const titleId = useId();
   const [live, setLive] = useState('');
-  const entitlements = useEntitlements();
   const { briefing, loading: briefingLoading } = useBriefing();
-  const showBriefing =
-    BriefingMessage !== null && isBriefingToday(briefing) && entitlements.known && !isKnownFree(entitlements, 'briefings');
+  const showBriefing = BriefingMessage !== null && isBriefingToday(briefing);
   const briefingAt = showBriefing && !dimmed ? briefing.generatedAt : null;
   useEffect(() => {
     if (briefingAt) window.dispatchEvent(new CustomEvent('javi:inbox-read', { detail: ['briefing'] }));
   }, [briefingAt]);
 
   const { readPageContext } = usePageContextReader();
-  const { ai } = useCachedJarvisAi();
-  const { threadFor, requestAdvice, retry } = useJaviSession({ readPageContext, ai, conversation: false });
+  // The insight is automatic, so it must not call POST /api/jarvis/advice before AI can answer: the server
+  // refuses with a 503 and the browser logs every non-2xx fetch as a console error. GET /api/jarvis/status
+  // always answers 200 and says whether Javi can run; a status that cannot be read lets the request go ahead.
+  const { status: aiStatus, loading: aiStatusLoading } = useJarvisStatus();
+  const ai = aiStatus?.ai ?? null;
+  const aiUnavailable = aiStatus?.available === false && isAiUnavailableError(aiStatus);
+  const { threadFor, requestAdvice, retry } = useJaviSession({ readPageContext, ai });
   const thread = threadFor(PAGE);
   const loading = thread.status === 'loading';
   const reply = thread.messages.findLast((m) => m.role === 'assistant') ?? null;
@@ -124,11 +136,12 @@ export default function JaviHomeCard({ dimmed = false }) {
   const requestedRef = useRef(false);
   useEffect(() => {
     if (dimmed || requestedRef.current || showBriefing || briefingLoading) return;
+    if (aiStatusLoading || aiUnavailable) return;
     if (thread.status !== 'idle' || thread.messages.length > 0 || thread.error) return;
     if (weatherLoading) return;
     requestedRef.current = true;
     requestAdvice(PAGE);
-  }, [dimmed, requestAdvice, thread.status, thread.messages.length, thread.error, showBriefing, briefingLoading, weatherLoading]);
+  }, [dimmed, requestAdvice, aiStatusLoading, aiUnavailable, thread.status, thread.messages.length, thread.error, showBriefing, briefingLoading, weatherLoading]);
 
   const liveText = showBriefing
     ? live
@@ -153,7 +166,7 @@ export default function JaviHomeCard({ dimmed = false }) {
           <button
             type="button"
             onClick={() => requestAdvice(PAGE, true)}
-            disabled={loading || dimmed}
+            disabled={loading || dimmed || aiUnavailable}
             aria-label="Refresh insight"
             title="Refresh insight"
             className={REFRESH_BTN}
@@ -173,7 +186,7 @@ export default function JaviHomeCard({ dimmed = false }) {
             <BriefingMessage announce={setLive} />
           </Suspense>
         ) : (
-          <HomeInsight thread={thread} retry={retry} loading={loading} />
+          <HomeInsight thread={thread} retry={retry} loading={loading} unavailable={aiUnavailable ? aiStatus : null} />
         )}
       </div>
       <WeatherSlot />

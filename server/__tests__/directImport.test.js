@@ -18,33 +18,15 @@ import { AUTO_STATE_KEYS, backupsShowUserData, directSource, discardStagedImport
 import { IMPORT_ASIDE_DIR, STAGED_IMPORT_DIR_RE } from '../backup/importConstants.js';
 import { latestSchemaVersion } from '../backup/snapshot.js';
 import { eraseAllData } from '../erase/eraseService.js';
-import { createActivationStore } from '../license/activationStore.js';
-import { createTrialStore } from '../license/trialStore.js';
 import { loadOrCreateKeyFile } from '../secrets/keyFile.js';
+import { LEGACY_LICENSE_FILES } from './helpers/eraseEnv.js';
 import { DATA_MARKER_FILE, markerContent } from '../dataFolderOwnership.js';
 import { cleanupBackupEnv, dataDir, enospc, resetBackupEnv } from './helpers/backupEnv.js';
 
 const tmpDirs = [];
 const open = [];
-const NOW = Math.floor(Date.now() / 1000) * 1000;
 const BACKUP_ID = '20260101T000000Z-manual-abc123';
 const no = async () => 'no';
-const ACTIVATION = {
-  store: 'gumroad',
-  productId: 'prod_synthetic',
-  variantId: null,
-  edition: 'standard',
-  purchaseDate: '2026-01-02T00:00:00Z',
-  updatesUntil: '2027-01-02T00:00:00Z',
-  expiresAt: null,
-  activatedAt: '2026-01-03T00:00:00Z',
-  keyHash: 'h'.repeat(43),
-  keyLast4: 'ABCD',
-  email: null,
-  instanceId: null,
-  test: false,
-};
-
 function tmp(label) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `burrow-import-${label}-`));
   tmpDirs.push(dir);
@@ -77,7 +59,7 @@ const stages = () => fs.readdirSync(dataDir()).filter((n) => STAGED_IMPORT_DIR_R
 const sourceOf = (dir) => ({ dir });
 
 /**
- * A direct Burrow folder: WAL database with the given notes, secrets.key, a trial and an activation record, a clock file and one backup.
+ * A direct Burrow folder: WAL database with the given notes, secrets.key, the legacy license files an older version left (never copied) and one backup.
  * The database is left open in `open` when `keepOpen`.
  */
 function makeSource({ notes = ['n1', 'n2'], keepOpen = false, withKey = true, withBackup = true, extra } = {}) {
@@ -87,10 +69,8 @@ function makeSource({ notes = ['n1', 'n2'], keepOpen = false, withKey = true, wi
   db.exec('PRAGMA wal_autocheckpoint = 0');
   for (const n of notes) addNote(db, n);
   if (withKey) {
-    const loadKey = () => loadOrCreateKeyFile({ dir });
-    createTrialStore({ dataDir: dir, getDb: () => db, loadKey, now: () => NOW }).start(NOW);
-    createActivationStore({ dataDir: dir, getDb: () => db, loadKey, now: () => NOW }).save(ACTIVATION);
-    fs.writeFileSync(path.join(dir, 'license-clock.json'), '{"v":1,"synthetic":true}\n');
+    loadOrCreateKeyFile({ dir });
+    for (const name of LEGACY_LICENSE_FILES) fs.writeFileSync(path.join(dir, name), JSON.stringify({ v: 1, synthetic: true }));
   }
   if (withBackup) {
     fs.mkdirSync(path.join(dir, 'backups'));
@@ -134,7 +114,7 @@ afterAll(() => {
 });
 
 describe('happy path: stage, then the swap at the next start', () => {
-  it('copies the data, leaves the source untouched, and the swap brings it in with the trial and the license', async () => {
+  it('copies the data, leaves the source untouched, and the swap brings it in without any license file', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no network allowed'));
     const { dir: src } = makeSource({ notes: ['alpha', 'beta'] });
     const before = listing(src);
@@ -174,16 +154,10 @@ describe('happy path: stage, then the swap at the next start', () => {
     expect(noteBodies(db)).toEqual(['alpha', 'beta']);
     expect(db.prepare('PRAGMA integrity_check').get().integrity_check).toBe('ok');
     expect(fs.readFileSync(path.join(dataDir(), 'secrets.key'), 'utf8')).toBe(fs.readFileSync(path.join(src, 'secrets.key'), 'utf8'));
-    expect(fs.readFileSync(path.join(dataDir(), 'license-clock.json'), 'utf8')).toBe(fs.readFileSync(path.join(src, 'license-clock.json'), 'utf8'));
+    // The legacy license files an older version left in the source are not copied.
+    for (const name of LEGACY_LICENSE_FILES) expect(fs.existsSync(path.join(dataDir(), name)), name).toBe(false);
     expect(fs.readFileSync(path.join(dataDir(), 'backups', `burrow-${BACKUP_ID}.db`))).toEqual(fs.readFileSync(path.join(src, 'backups', `burrow-${BACKUP_ID}.db`)));
 
-    // The trial and the activation come over and still verify with the copied key: no reset, no re-activation.
-    const loadKey = () => loadOrCreateKeyFile({ dir: dataDir() });
-    const trial = createTrialStore({ dataDir: dataDir(), getDb: () => db, loadKey, now: () => NOW }).load();
-    expect(trial).toMatchObject({ kind: 'valid', startedAt: NOW });
-    const activation = createActivationStore({ dataDir: dataDir(), getDb: () => db, loadKey, now: () => NOW }).load();
-    expect(activation.kind).toBe('active');
-    expect(activation.record).toMatchObject({ productId: ACTIVATION.productId, keyLast4: 'ABCD' });
     // No network at any point.
     expect(fetchSpy).not.toHaveBeenCalled();
     // Still untouched after the swap too.
@@ -256,7 +230,7 @@ describe('refusals leave both sides as they were', () => {
     expect(stages()).toHaveLength(1);
   });
 
-  it('refuses a source without secrets.key (the MAC key of the trial and license)', async () => {
+  it('refuses a source without secrets.key (the key of the saved API keys)', async () => {
     const { dir: src } = makeSource({ withKey: false, withBackup: false });
     const before = listing(src);
     await expect(importFromDirect(baseOpts(src))).rejects.toMatchObject({ code: 'import_source_invalid', status: 422 });
@@ -551,18 +525,17 @@ describe('isPristineDb: content, not counts (H1, H2)', () => {
     expect(isPristineDb(db)).toBe(false);
   });
 
-  it('a license-activation.json in the data folder means a license was activated here: not pristine', () => {
+  it('a legacy license-activation.json left by an older version is not use: nothing reads it any more', async () => {
     const db = getDb();
-    fs.writeFileSync(path.join(dataDir(), 'license-activation.json'), '{}\n');
-    expect(isPristineDb(db)).toBe(false);
-    // And with no burrow.db at all the target is not empty either.
+    fs.writeFileSync(path.join(dataDir(), 'license-activation.json'), '{}');
+    expect(isPristineDb(db)).toBe(true);
+    // And with no burrow.db at all the target is still empty.
     closeDb();
     fs.rmSync(path.join(dataDir(), 'burrow.db'), { force: true });
     fs.rmSync(path.join(dataDir(), 'burrow.db-wal'), { force: true });
     fs.rmSync(path.join(dataDir(), 'burrow.db-shm'), { force: true });
-    return getDirectImportStatus({ source: sourceOf(makeSource().dir), offered: true, getDbImpl: () => { throw new Error('none'); } }).then((status) => {
-      expect(status).toMatchObject({ canOffer: false, reason: 'target_has_data' });
-    });
+    const status = await getDirectImportStatus({ source: sourceOf(makeSource().dir), offered: true, getDbImpl: () => { throw new Error('none'); } });
+    expect(status).toMatchObject({ canOffer: true });
   });
 
   it('a saved key (app_secrets) means used', () => {
@@ -625,11 +598,11 @@ describe('isPristineDb: content, not counts (H1, H2)', () => {
     expect(stages()).toEqual([]);
   });
 
-  it('an activation file added after the import was prepared cancels it', async () => {
+  it('a legacy license file added after the import was prepared does not cancel it and is left alone', async () => {
     await stagedImport({});
-    fs.writeFileSync(path.join(dataDir(), 'license-activation.json'), '{}\n');
-    expect(await reconcileDirectImport({})).toEqual({ result: 'discarded', reason: 'target_has_data' });
-    expect(fs.readFileSync(path.join(dataDir(), 'license-activation.json'), 'utf8')).toBe('{}\n');
+    fs.writeFileSync(path.join(dataDir(), 'license-activation.json'), '{}');
+    expect(await reconcileDirectImport({})).toEqual({ result: 'swapped' });
+    expect(fs.readFileSync(path.join(dataDir(), 'license-activation.json'), 'utf8')).toBe('{}');
   });
 });
 
@@ -747,7 +720,7 @@ describe('the swap never gives up on a doubt (H3)', () => {
 });
 
 describe('a fast startup check (H4)', () => {
-  it('hashes only burrow.db, secrets.key and the license files; backups are checked by size', async () => {
+  it('hashes only burrow.db and secrets.key; backups are checked by size', async () => {
     const { dir: src } = makeSource({
       extra: (dir) => {
         // A large synthetic backup (80 MB of zeros) and a few small ones.
@@ -774,7 +747,7 @@ describe('a fast startup check (H4)', () => {
       return sha256File(file, ops);
     };
     expect(await reconcileDirectImport({ fsOps, hashFile })).toEqual({ result: 'swapped' });
-    expect(hashed.sort()).toEqual(['burrow.db', 'license-activation.json', 'license-clock.json', 'license-trial.json', 'secrets.key'].sort());
+    expect(hashed.sort()).toEqual(['burrow.db', 'secrets.key']);
     expect(opened.filter((f) => f.includes(`${path.sep}backups${path.sep}`))).toEqual([]);
     expect(fs.statSync(path.join(dataDir(), 'backups', `burrow-${BACKUP_ID}.db`)).size).toBe(80 * 1024 * 1024);
   });
@@ -807,18 +780,10 @@ describe('manifest validation (L2)', () => {
 });
 
 describe('every data file of the target moves aside before the imported key goes in (M1)', () => {
-  it('the target\'s own trial and clock files go aside even when the source has none, and before secrets.key is renamed in', async () => {
-    const made = makeSource({
-      extra: (dir) => {
-        fs.rmSync(path.join(dir, 'license-trial.json'), { force: true });
-        fs.rmSync(path.join(dir, 'license-clock.json'), { force: true });
-        fs.rmSync(path.join(dir, 'license-activation.json'), { force: true });
-      },
-    });
+  it('the targets own secrets.key goes aside, never overwritten, and the sources key is renamed in', async () => {
+    const made = makeSource();
     await importFromDirect(baseOpts(made.dir));
     closeDb();
-    fs.writeFileSync(path.join(dataDir(), 'license-trial.json'), 'target-trial');
-    fs.writeFileSync(path.join(dataDir(), 'license-clock.json'), 'target-clock');
     fs.writeFileSync(path.join(dataDir(), 'secrets.key'), 'target-key');
     const order = [];
     const realRename = createFsOps().rename;
@@ -831,14 +796,11 @@ describe('every data file of the target moves aside before the imported key goes
     expect(await reconcileDirectImport({ fsOps })).toEqual({ result: 'swapped' });
     const keyIn = order.indexOf('secrets.key->' + path.basename(dataDir()));
     expect(keyIn).toBeGreaterThan(-1);
-    for (const name of ['license-trial.json', 'license-clock.json']) {
-      const aside = order.findIndex((o) => o.startsWith(`${name}->`));
-      expect(aside).toBeGreaterThan(-1);
-      expect(aside).toBeLessThan(keyIn);
-      expect(fs.existsSync(path.join(dataDir(), name))).toBe(false);
-    }
+    const keyAside = order.findIndex((o) => o.startsWith('secrets.key->') && !o.endsWith(`->${path.basename(dataDir())}`));
+    expect(keyAside).toBeGreaterThan(-1);
+    expect(keyAside).toBeLessThan(keyIn);
     const aside = asideFiles().map((n) => n.split('/')[1]);
-    expect(aside).toEqual(expect.arrayContaining(['license-trial.json', 'license-clock.json', 'secrets.key']));
+    expect(aside).toEqual(expect.arrayContaining(['secrets.key']));
     expect(fs.readFileSync(path.join(dataDir(), 'secrets.key'), 'utf8')).toBe(fs.readFileSync(path.join(made.dir, 'secrets.key'), 'utf8'));
   });
 });
@@ -862,20 +824,20 @@ describe('the swap never skips or overwrites (M2)', () => {
 
   it('fails closed instead of overwriting a live file that is still there when the staged one is renamed in', async () => {
     await stagedImport({});
-    const clock = path.join(dataDir(), 'license-clock.json');
-    fs.writeFileSync(clock, 'live clock');
+    const key = path.join(dataDir(), 'secrets.key');
+    fs.writeFileSync(key, 'live key');
     const realRename = createFsOps().rename;
-    // The move-aside of the live clock "succeeds" without moving it, so the rename-in finds it there.
+    // The move-aside of the live key "succeeds" without moving it, so the rename-in finds it there.
     const fsOps = createFsOps({
       rename: async (from, to) => {
-        if (String(from) === clock && String(to).includes(IMPORT_ASIDE_DIR)) return undefined;
+        if (String(from) === key && String(to).includes(IMPORT_ASIDE_DIR)) return undefined;
         return realRename(from, to);
       },
     });
     await expect(reconcileDirectImport({ fsOps })).rejects.toMatchObject({ code: 'import_swap_conflict' });
-    expect(fs.readFileSync(clock, 'utf8')).toBe('live clock');
+    expect(fs.readFileSync(key, 'utf8')).toBe('live key');
     expect(stages()).toHaveLength(1);
-    expect(fs.existsSync(path.join(dataDir(), stages()[0], 'license-clock.json'))).toBe(true);
+    expect(fs.existsSync(path.join(dataDir(), stages()[0], 'secrets.key'))).toBe(true);
   });
 
   it('a started swap next to an interrupted backup restore refuses to start with a clear reason; a stage that has not started waits', async () => {
@@ -1136,7 +1098,7 @@ const donePathFails = (realRename) =>
   });
 
 describe('a swap that is finished but whose stage cannot be closed (M1)', () => {
-  it('a failed .done rename leaves the stage; a database used since and a new activation file survive the next start', async () => {
+  it('a failed .done rename leaves the stage; a database used since and a new legacy license file survive the next start', async () => {
     const made = await stagedImport({ notes: ['imported'] });
     expect(await reconcileDirectImport({ fsOps: donePathFails(createFsOps().rename) })).toEqual({ result: 'swapped' });
     // The stage is still there whole (marker and manifest), nothing was wiped.
@@ -1145,17 +1107,15 @@ describe('a swap that is finished but whose stage cannot be closed (M1)', () => 
     expect(fs.existsSync(path.join(stage, 'import-swapping'))).toBe(true);
     expect(fs.existsSync(path.join(stage, 'import-manifest.json'))).toBe(true);
 
-    // The app runs: the database is used and a license is activated here (a new file the import did not carry).
+    // The app runs: the database is used and a new file the import did not carry appears.
     addNote(getDb(), 'added after the swap');
     closeDb();
     const activation = path.join(dataDir(), 'license-activation.json');
     fs.writeFileSync(activation, '{"v":1,"new":true}\n');
-    const clockBefore = fs.readFileSync(path.join(dataDir(), 'license-clock.json'), 'utf8');
 
     expect(await reconcileDirectImport({})).toEqual({ result: 'swapped' });
     expect(stages()).toEqual([]);
     expect(fs.readFileSync(activation, 'utf8')).toBe('{"v":1,"new":true}\n');
-    expect(fs.readFileSync(path.join(dataDir(), 'license-clock.json'), 'utf8')).toBe(clockBefore);
     expect(noteBodies(getDb())).toEqual(['added after the swap', 'imported']);
     expect(fs.readFileSync(path.join(dataDir(), 'secrets.key'), 'utf8')).toBe(fs.readFileSync(path.join(made.dir, 'secrets.key'), 'utf8'));
     // Nothing of the new activation file went aside.
@@ -1173,11 +1133,11 @@ describe('a swap that is finished but whose stage cannot be closed (M1)', () => 
         },
       }),
     ).rejects.toMatchObject({ code: 'simulated_crash' });
-    // The source had no copy of this one, so it is not staged: after the key is in, it belongs to the imported Burrow.
-    fs.writeFileSync(path.join(dataDir(), 'license-clock.json'), 'newer clock');
+    // A file the stage does not carry: after the key is in, it belongs to the imported Burrow.
+    fs.writeFileSync(path.join(dataDir(), 'newer-file.txt'), 'newer');
     expect(await reconcileDirectImport({})).toEqual({ result: 'swapped' });
     expect(stages()).toEqual([]);
-    expect(fs.existsSync(path.join(dataDir(), 'license-clock.json'))).toBe(true);
+    expect(fs.existsSync(path.join(dataDir(), 'newer-file.txt'))).toBe(true);
   });
 
   it('a marker-only leftover (no manifest, nothing staged) finishes cleanly and touches nothing live', async () => {
@@ -1448,10 +1408,10 @@ describe('a file that cannot be looked at is never read as missing (H1)', () => 
     markSwapping();
     const stageDir = path.join(dataDir(), stages()[0]);
     const realRename = createFsOps().rename;
-    // The rename of the license-clock file "succeeds" but a copy stays behind in the stage.
+    // The rename of the secrets.key file "succeeds" but a copy stays behind in the stage.
     const fsOps = createFsOps({
       rename: async (from, to) => {
-        if (String(from).includes('.import-') && String(from).endsWith('license-clock.json')) {
+        if (String(from).includes('.import-') && String(from).endsWith('secrets.key')) {
           fs.copyFileSync(from, to);
           return;
         }
@@ -1459,7 +1419,7 @@ describe('a file that cannot be looked at is never read as missing (H1)', () => 
       },
     });
     await expect(reconcileDirectImport({ fsOps })).rejects.toMatchObject({ code: 'import_swap_incomplete' });
-    expect(fs.existsSync(path.join(stageDir, 'license-clock.json'))).toBe(true);
+    expect(fs.existsSync(path.join(stageDir, 'secrets.key'))).toBe(true);
   });
 });
 
@@ -1618,5 +1578,80 @@ describe('the import only writes into a folder that carries our ownership marker
     const before = listing(dataDir());
     expect(await reconcileDirectImport({})).toEqual({ result: 'none' });
     expect(listing(dataDir())).toEqual(before);
+  });
+});
+
+// A stage written by the previous version lists the license files in its manifest. It must still verify and swap everything else.
+describe('a stage with a legacy manifest (license files listed)', () => {
+  const LEGACY = ['license-activation.json', 'license-trial.json', 'license-clock.json'];
+  function addLegacyToStage() {
+    const stage = path.join(dataDir(), stages()[0]);
+    const manifest = manifestOf(stage);
+    for (const name of LEGACY) {
+      const body = `{"legacy":"${name}"}\n`;
+      fs.writeFileSync(path.join(stage, name), body);
+      manifest.files.push({ rel: name, size: Buffer.byteLength(body), sha256: crypto.createHash('sha256').update(body).digest('hex') });
+    }
+    fs.writeFileSync(path.join(stage, 'import-manifest.json'), JSON.stringify(manifest));
+    return stage;
+  }
+  const expectNoLegacyLive = () => {
+    for (const name of LEGACY) expect(fs.existsSync(path.join(dataDir(), name))).toBe(false);
+  };
+
+  it('not started: verifies, swaps everything else, never swaps the legacy files in', async () => {
+    const made = await stagedImport({ notes: ['from-old-stage'] });
+    addLegacyToStage();
+    expect(await reconcileDirectImport({})).toEqual({ result: 'swapped' });
+    expect(noteBodies(getDb())).toEqual(['from-old-stage']);
+    expect(fs.readFileSync(path.join(dataDir(), 'secrets.key'), 'utf8')).toBe(fs.readFileSync(path.join(made.dir, 'secrets.key'), 'utf8'));
+    expectNoLegacyLive();
+    expect(stages()).toEqual([]);
+  });
+
+  it('a tampered legacy file does not make the stage unverified (it is never read)', async () => {
+    await stagedImport({ notes: ['n'] });
+    const stage = addLegacyToStage();
+    fs.writeFileSync(path.join(stage, 'license-trial.json'), 'changed');
+    expect(await reconcileDirectImport({})).toEqual({ result: 'swapped' });
+    expectNoLegacyLive();
+  });
+
+  it('started: a crash mid-swap resumes to the same end and the legacy files are dropped', async () => {
+    await stagedImport({ notes: ['resume-old-stage'] });
+    addLegacyToStage();
+    await expect(
+      reconcileDirectImport({
+        hooks: {
+          afterMove: () => {
+            throw crash();
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'simulated_crash' });
+    expect(fs.existsSync(path.join(dataDir(), stages()[0], 'import-swapping'))).toBe(true);
+    expect(await reconcileDirectImport({})).toEqual({ result: 'swapped' });
+    expect(noteBodies(getDb())).toEqual(['resume-old-stage']);
+    expectNoLegacyLive();
+    expect(stages()).toEqual([]);
+  });
+
+  it('started, every real file already in place and only legacy files left: the swap is closed', async () => {
+    await stagedImport({ notes: ['all-moved'] });
+    const stage = addLegacyToStage();
+    await expect(
+      reconcileDirectImport({
+        hooks: {
+          afterMove: (name) => {
+            if (name === 'burrow.db') throw crash();
+          },
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'simulated_crash' });
+    // A leftover legacy file (the old version had not moved it) is dropped, not waited for.
+    fs.writeFileSync(path.join(stage, 'license-trial.json'), '{}');
+    expect(await reconcileDirectImport({})).toEqual({ result: 'swapped' });
+    expect(noteBodies(getDb())).toEqual(['all-moved']);
+    expect(stages()).toEqual([]);
   });
 });

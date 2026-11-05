@@ -19,7 +19,7 @@ Burrow is a local-first personal data OS. It runs on your own machine and keeps 
 - Folders: pick a folder on your computer and Burrow lists its files, counts, sizes and duplicates, writes short summaries with Javi and exports the list (Markdown, JSON or CSV). It only reads the folders you choose. PDF and Word files show as Not supported yet; support for them is coming in a later version.
 - Data browser (Settings > Data & storage)
 - Export / import
-- Javi, the AI assistant (the Javi card on Home, and the bar at the bottom right of the other pages except Settings: one quick insight about each page on Free; Pro adds follow-up questions, ask Javi about your data, actions and the daily briefing, shown in the Javi card), running on a local Ollama model (see [AI (Javi) setup](#ai-javi-setup))
+- Javi, the AI assistant (the Javi card on Home, and the bar at the bottom right of the other pages except Settings: a quick insight about each page, follow-up questions, ask Javi about your data, actions you approve and the daily briefing, shown in the Javi card; all free in official builds), running on a local Ollama model (see [AI (Javi) setup](#ai-javi-setup))
 
 ## Privacy
 
@@ -237,7 +237,7 @@ The upgrade safety copy (`burrow.db.pre-vN.bak`) that Burrow writes before a sch
 
 ## Erase all my data
 
-Settings > Data & storage > Danger zone > **Erase all my data** permanently deletes everything you saved in Burrow on this computer and returns Burrow to first-run. It asks you to type `ERASE`, then to confirm a list of what goes and what stays. It saves a final export first (on by default). Your license and Pro trial status are kept; the license is removed only if you tick **Also remove my license from this computer**, and your backups stay unless you tick **Also delete all backups on this computer**. It also deletes the upgrade safety copies (`burrow.db.pre-vN.bak`) and any unfinished or temporary files in the backups folder (your finished backups stay). Saved API keys are deleted; the license key and the local key file that protects the Pro trial record are kept. Under the hood: `POST /api/data/erase/request` returns a single-use token that lasts 2 minutes, then `POST /api/data/erase` needs the token, `{ "phrase": "ERASE" }` and, when a web sign-in password is set, `{ "password" }`; it only accepts a request that comes from Burrow's own window (same origin), allows 3 tries per 15 minutes and never answers a GET. The data is deleted in one transaction with secure delete on, then the file is compacted so freed space holds no old text.
+Settings > Data & storage > Danger zone > **Erase all my data** permanently deletes everything you saved in Burrow on this computer and returns Burrow to first-run. It asks you to type `ERASE`, then to confirm a list of what goes and what stays. It saves a final export first (on by default). Your backups stay unless you tick **Also delete all backups on this computer**. It also deletes the upgrade safety copies (`burrow.db.pre-vN.bak`) and any unfinished or temporary files in the backups folder (your finished backups stay). Saved API keys are deleted, as are any license or trial files an older version left behind; the local key file (`secrets.key`) is kept. Under the hood: `POST /api/data/erase/request` returns a single-use token that lasts 2 minutes, then `POST /api/data/erase` needs the token, `{ "phrase": "ERASE" }` and, when a web sign-in password is set, `{ "password" }`; it only accepts a request that comes from Burrow's own window (same origin), allows 3 tries per 15 minutes and never answers a GET. The data is deleted in one transaction with secure delete on, then the file is compacted so freed space holds no old text.
 
 ## Export and import
 
@@ -263,7 +263,7 @@ Saved API keys and the audit log are never exported, and sensitive settings valu
 
 ## Source
 
-The source of the Burrow core is public at https://github.com/ChristianMunoz31/burrow-core under AGPL-3.0-only. Pro features are a private module, so they are not part of that repository.
+Burrow is free for everyone: no trial, no license key, no paid tier. The source of the Burrow core is public at https://github.com/ChristianMunoz31/burrow-core under AGPL-3.0-only. Some features (Javi's tools, briefings, Explain and the Folders question and report features) are a private module that official builds include at no cost; it is not part of that repository. See [docs/LICENSING.md](docs/LICENSING.md).
 
 ## Development
 
@@ -277,7 +277,7 @@ npm run build     # production build into dist/
 
 Other scripts: `npm run test:watch`, `npm run preview`, `npm run eval:javi` (real-model speed and accuracy eval, needs Ollama).
 
-Pro features (Javi's tools, briefings, Explain and the Folders question and report features) ship in a private module that sits next to the core as `pro/`. A checkout without it builds and runs as a Free build. Developers: the module boundary is described in [docs/OPEN_CORE.md](docs/OPEN_CORE.md).
+The private module (Javi's tools, briefings, Explain and the Folders question and report features) sits next to the core as `pro/`. A checkout without it builds and runs as a core-only build that says those features are not included in this build. Developers: the module boundary is described in [docs/OPEN_CORE.md](docs/OPEN_CORE.md).
 
 Layout:
 
@@ -292,8 +292,8 @@ Layout:
 
 - Docker packaging
 - Desktop app
-- Paid tier (AI features and device sync); Burrow is open-core: the core is open source and Pro features are a private module (see [docs/OPEN_CORE.md](docs/OPEN_CORE.md))
+- Device sync (no paid tier: Burrow is free for everyone). Burrow is open-core: the core is open source and some features are a private module (see [docs/OPEN_CORE.md](docs/OPEN_CORE.md))
 
 ## License
 
-The Burrow core is licensed under AGPL-3.0-only. See [LICENSE](LICENSE). Pro features are a private module and are not covered by that license.
+The Burrow core is licensed under AGPL-3.0-only. See [LICENSE](LICENSE). The private module is proprietary and is not covered by that license; official builds include it at no cost. See [docs/LICENSING.md](docs/LICENSING.md).

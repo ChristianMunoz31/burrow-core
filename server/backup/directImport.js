@@ -1,7 +1,7 @@
 // "Import from your existing Burrow": a user-clicked, one-way copy of the direct (installer) Burrow's data into the
 // Microsoft Store build whose data folder is %USERPROFILE%\Burrow Data (data location "userprofile"; docs/MICROSOFT_STORE.md).
-// Why it exists: that build cannot read the direct data in place (it is a different folder), and a new folder means a new
-// trial and no history.
+// Why it exists: that build cannot read the direct data in place (it is a different folder), and a new folder means no
+// history.
 //
 // Rules, in order of importance:
 // 1. The source (the direct Burrow's folder) is only ever READ, with plain read-only file handles (the same method as the
@@ -9,7 +9,7 @@
 //    connection creates -wal and -shm files there). Nothing in the source is moved, modified, locked or deleted.
 // 2. Nothing is imported over data. The target must be empty: no burrow.db, or a database this Burrow created itself and
 //    nobody has used (`isPristineDb`: every table empty except the default to-do columns, `app_state` holding only keys the
-//    app writes by itself, no saved keys, no activation record). A used database refuses with 409 import_target_not_empty.
+//    app writes by itself, no saved keys). A used database refuses with 409 import_target_not_empty.
 // 3. The work happens in a private staging folder inside the target (<data dir>/.import-<16 hex>/) and is verified there
 //    (integrity_check, schema version, per-table row counts against the source copy, sha-256 of every file). Only a stage
 //    with a manifest is complete. A failure removes that folder and nothing else.
@@ -25,15 +25,14 @@
 //    id by id (data first, metadata last), so the newer empty ones never take the retention slots of the imported ones.
 //    Every existence check during the swap is strict (only ENOENT / ENOTDIR means "not there"; anything else refuses the
 //    start with import_swap_transient and is retried at the next start).
-//    The startup check must stay fast (the shell waits 60 s for the ready line): it hashes only burrow.db, secrets.key and
-//    the license files and checks the backups by size, because the backups were hashed at stage time and the database was
+//    The startup check must stay fast (the shell waits 60 s for the ready line): it hashes only burrow.db and secrets.key and
+//    checks the backups by size, because the backups were hashed at stage time and the database was
 //    integrity checked at stage time (the manifest records it; the hash proves it is the same file).
 //
 // What is copied (the whole data-folder layout the app needs): burrow.db (a consistent VACUUM INTO snapshot, saved API keys
-// kept), secrets.key (REQUIRED: the MAC key of the trial, clock and activation records and the encryption key of saved API
-// keys), license-activation.json, license-trial.json, license-clock.json and the backups (burrow-<id>.db, .export.zip,
-// .meta.json). Not copied: pre-migration .bak files, restore-aside, state.json (run state), logs, partial files.
-// No network call is made: the activation record is copied as it is and keeps counting as the same seat.
+// kept), secrets.key (REQUIRED: the encryption key of saved API keys) and the backups (burrow-<id>.db, .export.zip,
+// .meta.json). Not copied: pre-migration .bak files, restore-aside, state.json (run state), logs, partial files, and the
+// license files older versions kept (nothing reads them any more). No network call is made.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,11 +42,11 @@ import { RESTORE_JOURNAL_FILENAME, DB_FILENAME, getDb } from '../db/index.js';
 import { loadMigrations, migrate } from '../db/migrate.js';
 import { upsert } from '../db/query.js';
 import { TABLES } from '../db/tables.js';
-import { ACTIVATION_FILE_NAME, CLOCK_FILE_NAME, TRIAL_FILE_NAME } from '../license/constants.js';
 import { DEFAULT_TODO_COLUMNS } from '../normalize.js';
 import { appDataFolderDir, usesUserProfileDir } from '../paths.js';
 import { hasOwnershipMarker } from '../dataFolderOwnership.js';
 import { KEY_FILE_NAME } from '../secrets/keyFile.js';
+import { ACTIVATION_FILE_NAME, CLOCK_FILE_NAME, CLOCK_STATE_KEY, TRIAL_FILE_NAME, TRIAL_NOTICES_STATE_KEY, TRIAL_STATE_KEY } from '../license/constants.js';
 import { BackupError, isBackupError, isNoSpaceError } from './errors.js';
 import { createFsOps, isMissing, renameWithRetry, rmWithRetry, writeFileSynced } from './fsops.js';
 import {
@@ -76,12 +75,15 @@ const DISK_FACTOR = 3;
 /** Files of the data folder copied next to the database. The key is required. */
 export const IMPORT_DATA_FILES = Object.freeze([
   { name: KEY_FILE_NAME, required: true },
-  { name: ACTIVATION_FILE_NAME, required: false },
-  { name: TRIAL_FILE_NAME, required: false },
-  { name: CLOCK_FILE_NAME, required: false },
 ]);
+/**
+ * Files a stage written by an older version may still list (the license files). The manifest of such a stage stays valid, but
+ * they are never verified, swapped in or kept: they are deleted from the stage before the stage-empty check.
+ */
+export const LEGACY_STAGED_FILES = Object.freeze([ACTIVATION_FILE_NAME, TRIAL_FILE_NAME, CLOCK_FILE_NAME]);
+const isLegacyStaged = (rel) => LEGACY_STAGED_FILES.includes(rel);
 const DB_SIDE_NAMES = Object.freeze([DB_FILENAME, `${DB_FILENAME}-wal`, `${DB_FILENAME}-shm`, `${DB_FILENAME}-journal`]);
-const SWAP_ORDER = Object.freeze([KEY_FILE_NAME, ACTIVATION_FILE_NAME, TRIAL_FILE_NAME, CLOCK_FILE_NAME, 'backups', DB_FILENAME]);
+const SWAP_ORDER = Object.freeze([KEY_FILE_NAME, 'backups', DB_FILENAME]);
 /** Tables that may hold rows without the user having used the app (each has its own rule in isPristineDb). */
 const SPECIAL_TABLES = new Set(['app_state', 'app_secrets', 'audit_log', 'todo_columns']);
 /** The staged files that are re-hashed at startup; every other staged file (the backups) is checked by size. */
@@ -106,12 +108,12 @@ const isBackupFileName = (name) => {
 
 /**
  * The app_state keys this Burrow writes by itself, without the user adding anything (checked against every writer):
- * - license.trial, license.clock: written by initLicense on the first start (server/license).
- * - license.trialNotices: the one-time welcome / ending / ended flags (server/license/trialNotices.js).
+ * - license.trial, license.clock, license.trialNotices: legacy records that older versions wrote on the first start; nothing
+ *   writes them now, they stay listed so a database that still has them counts as unused.
  * - profile: only without a display name. Onboarding's Skip writes { onboardedAt } alone; a typed name is the user's data.
  * - directImport:notice, directImport:cancelledSeen, dataFolderWarning:seen: dismissal flags of notices on Home and Settings.
  * - directImport:cancelled: written at startup when a prepared import was cancelled (server.js).
- * - jarvis.briefing.latest: the automatic daily briefing (Pro trial + local Ollama, server/scheduler.js) caches its result here
+ * - jarvis.briefing.latest: the automatic daily briefing (local Ollama, server/scheduler.js) caches its result here
  *   without any user action; it writes nothing else in the user tables (its audit row is ignored). A briefing the user asked for
  *   with Refresh writes the same key, which is harmless here: it only moves aside with the empty database.
  * - workspace: legacy view state written by 1.2 pre-release and Dev builds (`budget` or `journal`); nothing writes it now.
@@ -119,13 +121,13 @@ const isBackupFileName = (name) => {
  * - javi.inbox: Javi's read markers (page keys and timestamps, no user data), written by the first page report and by
  *   the write observer (server/javi/inbox.js), the same class as the dismissal flags.
  * Everything else is the user's: budget:targets / payees / spent / structure / defaults, pos:focus, pos:homeLayout, theme,
- * mode, network.optIn, backup.*, ai.*, Javi memory and license.activation. A key not listed here counts as used.
+ * mode, network.optIn, backup.*, ai.*, Javi memory and a legacy license.activation. A key not listed here counts as used.
  * @type {ReadonlyMap<string, (value: unknown) => boolean>}
  */
 export const AUTO_STATE_KEYS = new Map([
-  ['license.trial', () => true],
-  ['license.clock', () => true],
-  ['license.trialNotices', () => true],
+  [TRIAL_STATE_KEY, () => true],
+  [CLOCK_STATE_KEY, () => true],
+  [TRIAL_NOTICES_STATE_KEY, () => true],
   ['directImport:notice', () => true],
   [CANCELLED_KEY, () => true],
   ['directImport:cancelledSeen', () => true],
@@ -251,15 +253,14 @@ function freshCounts() {
  * True when nobody has put anything in this Burrow yet. Contents, not only counts: every table other than the four below has
  * exactly the rows of a fresh database; `todo_columns` holds nothing or exactly the default columns (same names, orders and
  * colors, so deleting a default and adding another one is a change); `app_state` holds only keys in AUTO_STATE_KEYS (the
- * app's own first-start records; budgets, focus and home layout, the license activation and every other setting are the
- * user's); `app_secrets` is empty; `audit_log` may hold the app's own rows. A license-activation.json in the data folder
- * means the user activated a license here, and a backup that holds user data (backupsShowUserData) means data was here.
+ * app's own first-start records; budgets, focus and home layout, and every other setting are the
+ * user's); `app_secrets` is empty; `audit_log` may hold the app's own rows. A backup that holds user data
+ * (backupsShowUserData) means data was here.
  * @param {import('node:sqlite').DatabaseSync} db
  * @param {{ dataDir?: string }} [opts]
  * @returns {boolean}
  */
 export function isPristineDb(db, { dataDir = dataDirOf() } = {}) {
-  if (fs.existsSync(path.join(dataDir, ACTIVATION_FILE_NAME))) return false;
   if (backupsShowUserData(dataDir)) return false;
   const now = countRows(db).rowCounts;
   const fresh = freshCounts();
@@ -295,14 +296,13 @@ function safePristine(getDbImpl, closeAfter = false, dataDir = dataDirOf()) {
 }
 
 /**
- * True when this Burrow has nothing of its own yet: no burrow.db at all (and no activation record), or a database nobody has
+ * True when this Burrow has nothing of its own yet: no burrow.db at all, or a database nobody has
  * used (isPristineDb).
  * @param {{ dataDir: string, fsOps: import('./fsops.js').FsOps, getDbImpl: () => import('node:sqlite').DatabaseSync }} opts
  */
 async function targetIsEmpty({ dataDir, fsOps, getDbImpl }) {
   const existing = await statOrNull(path.join(dataDir, DB_FILENAME), fsOps).catch(() => null);
   if (existing === null) {
-    if ((await statOrNull(path.join(dataDir, ACTIVATION_FILE_NAME), fsOps).catch(() => ({}))) !== null) return false;
     return !backupsShowUserData(dataDir);
   }
   return safePristine(getDbImpl, false, dataDir);
@@ -615,9 +615,9 @@ export async function importFromDirect({
   }
 }
 
-/** True for a staged file name the importer could have written: the database, a data file or a backup file. */
+/** True for a staged file name the importer could have written: the database, a data file, a backup file or a legacy license file. */
 function isStagedName(rel) {
-  if (rel === DB_FILENAME || IMPORT_DATA_FILES.some((f) => f.name === rel)) return true;
+  if (rel === DB_FILENAME || isLegacyStaged(rel) || IMPORT_DATA_FILES.some((f) => f.name === rel)) return true;
   return rel.startsWith('backups/') && isBackupFileName(rel.slice('backups/'.length));
 }
 
@@ -640,7 +640,7 @@ function manifestShapeOk(manifest) {
 }
 
 /**
- * Checks a complete stage before the first file moves. Fast on purpose: burrow.db, secrets.key and the license files are
+ * Checks a complete stage before the first file moves. Fast on purpose: burrow.db and secrets.key are
  * re-hashed; every other file (the backups) is checked by size, because it was hashed when it was staged. The database
  * integrity_check ran at stage time (the manifest says so), and the hash proves the file is the one that was checked.
  */
@@ -669,6 +669,22 @@ async function verifyStage({ dir, manifest, fsOps, hashFile }) {
     }
   }
   return true;
+}
+
+/**
+ * Deletes the legacy license files an older version staged and returns the manifest without them, so nothing verifies, swaps
+ * or waits for them. A file that cannot be removed right now refuses the start (import_swap_transient); the next start retries.
+ */
+async function dropLegacyStaged({ stageDir, manifest, fsOps }) {
+  for (const f of manifest.files) {
+    if (!isLegacyStaged(f.rel)) continue;
+    try {
+      await rmWithRetry(path.join(stageDir, f.rel), { fsOps });
+    } catch (e) {
+      throw swapError('import_swap_transient', e);
+    }
+  }
+  return { ...manifest, files: manifest.files.filter((f) => !isLegacyStaged(f.rel)) };
 }
 
 const transientError = (cause) => Object.assign(new Error('Import stage could not be read right now'), { code: 'verify_transient', cause });
@@ -849,6 +865,7 @@ export async function reconcileDirectImport({ dataDir = dataDirOf(), fsOps = cre
     manifestError = e;
   }
   const manifestOk = manifestShapeOk(manifest);
+  if (manifestOk) manifest = await dropLegacyStaged({ stageDir: stage.dir, manifest, fsOps });
   if (started) {
     // Files may already have moved. With staged files still in the stage and no readable manifest nothing says what belongs
     // where: keep everything and refuse. With no staged data file left every rename happened: the swap is finished and only
@@ -885,7 +902,7 @@ export async function reconcileDirectImport({ dataDir = dataDirOf(), fsOps = cre
     const liveDb = path.join(dataDir, DB_FILENAME);
     const used = (await exists(liveDb, fsOps))
       ? !safePristine(() => new DatabaseSync(liveDb), true, dataDir)
-      : (await exists(path.join(dataDir, ACTIVATION_FILE_NAME), fsOps)) || backupsShowUserData(dataDir);
+      : backupsShowUserData(dataDir);
     if (used) {
       await wipeDir(stage.dir, fsOps).catch(() => {});
       log('import: this Burrow got data of its own after the import was prepared; the import was cancelled');
@@ -897,10 +914,10 @@ export async function reconcileDirectImport({ dataDir = dataDirOf(), fsOps = cre
   const stamp = manifest.createdAt.replace(/[-:.]/g, '').slice(0, 15);
   const asideDir = path.join(dataDir, IMPORT_ASIDE_DIR, stamp);
   const staged = new Set(manifest.files.map((f) => f.rel));
-  // Before the imported key goes in, the target's own copy of every data file moves aside, staged or not: a trial, clock or
-  // activation record of this Burrow's own must never be checked against (or outlive) the key it was made with. This runs only
+  // Before the imported key goes in, the target's own copy of every data file moves aside, staged or not: data of
+  // this Burrow's own must never be checked against (or outlive) the key it was made with. This runs only
   // while the staged key is still in the stage: the key is first in SWAP_ORDER, so once it is in, the target's own files are
-  // already aside and what is in the data folder now (an activation record added since, say) belongs to the imported Burrow.
+  // already aside and what is in the data folder now belongs to the imported Burrow.
   if (await exists(path.join(stage.dir, KEY_FILE_NAME), fsOps)) {
     for (const { name } of IMPORT_DATA_FILES) {
       const pending = staged.has(name) ? await exists(path.join(stage.dir, name), fsOps) : true;
@@ -934,7 +951,7 @@ export async function reconcileDirectImport({ dataDir = dataDirOf(), fsOps = cre
       throw swapError('import_swap_transient', e);
     }
     if (!st || !st.isFile() || st.size !== f.size) throw swapError('import_swap_incomplete');
-    // The key and the license files are tiny and decide whether the imported records verify: size alone is not enough.
+    // The key is tiny and decides whether the imported secrets decrypt: size alone is not enough.
     if (HASHED_FILES.has(f.rel) && f.rel !== DB_FILENAME) {
       let sum;
       try {

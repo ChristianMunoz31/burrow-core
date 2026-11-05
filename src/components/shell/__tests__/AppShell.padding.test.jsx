@@ -8,7 +8,6 @@ import AppShell from '../AppShell';
 vi.mock('../BurgerMenu', () => ({ default: () => null }));
 vi.mock('../TopBar', () => ({ default: () => null }));
 vi.mock('../../palette/LazyCommandPalette', () => ({ default: () => null }));
-vi.mock('../../license/TrialNotice', () => ({ default: () => null }));
 vi.mock('../../javi/JaviAdvisor', () => ({ default: () => null }));
 
 const settings = vi.hoisted(() => ({ value: { showButton: true, autoAdvise: true } }));

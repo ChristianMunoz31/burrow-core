@@ -5,7 +5,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import express from 'express';
 import request from 'supertest';
 
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 

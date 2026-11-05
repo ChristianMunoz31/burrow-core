@@ -2,8 +2,6 @@ import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'rea
 import { Link, matchPath, useLocation } from 'react-router-dom';
 import { ChevronDown, Menu, X } from 'lucide-react';
 import { NAV_GROUPS } from './navItems';
-import { useLicenseFlags } from '../../hooks/useLicense';
-import FounderBadge from '../license/FounderBadge';
 import { SHELL_ICON_BTN } from './shellStyles';
 import { lsKey } from '../../utils/storageKeys';
 import { useSyncedSetting } from '../../hooks/useSyncedSetting';
@@ -90,7 +88,6 @@ function saveSections(map) {
 // disclosure button (its rows show only while expanded), a divider and Calendar. The top bar's wordmark also
 // opens Home and its gear opens Settings. All of it comes from NAV_GROUPS (navItems.js).
 export default function BurgerMenu() {
-  const { founderBackground } = useLicenseFlags();
   const { pathname } = useLocation();
   const [storedNavHideSubcategories] = useSyncedSetting(
     SETTINGS_KEYS.navHideSubcategories,
@@ -326,7 +323,6 @@ export default function BurgerMenu() {
 
             <div className="px-4 py-3 border-t border-slate-slate700/50 text-xs text-slate-slate400">
               <div>Private, on this device</div>
-              {founderBackground && <FounderBadge className="mt-2" />}
             </div>
           </aside>
         </div>

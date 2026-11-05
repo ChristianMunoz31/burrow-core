@@ -10,7 +10,6 @@ import { createBackup } from '../backup/service.js';
 import { backupsDir } from '../backup/paths.js';
 import { TABLES, select, setDbMaintenance } from '../db/index.js';
 import { LICENSE_KEY_SECRET_NAME } from '../license/constants.js';
-import { getLicenseStatus, initLicense, resetLicenseForTests } from '../license/index.js';
 import { EraseError, eraseAllData, eraseUnavailable } from '../erase/eraseService.js';
 import { registerExportRoutes } from '../exportRoutes.js';
 import { createFsOps } from '../backup/fsops.js';
@@ -20,6 +19,7 @@ import {
   SENTINEL,
   filesContaining,
   freshDb,
+  LEGACY_LICENSE_FILES,
   licenseRows,
   plantSentinelEverywhere,
   rawDbBytes,
@@ -36,7 +36,6 @@ beforeEach(() => {
   freshDb();
 });
 afterEach(() => {
-  resetLicenseForTests();
   cleanupBackupEnv();
 });
 
@@ -54,23 +53,24 @@ describe('what the wipe deletes', () => {
     expect(select('audit_log', { columns: ['feature'], db }).map((r) => r.feature)).not.toContain('javi_chat');
   });
 
-  it('removes consent, categories, display name, onboarding and every other setting, keeping only the license records', async () => {
+  it('removes consent, categories, display name, onboarding and every other setting, including the legacy license rows', async () => {
     const { db } = seedEverything();
     expect(stateKeys(db)).toEqual(expect.arrayContaining(['profile', 'ai.cloudConsent', 'ai.cloudCategories', 'theme', 'network.optIn']));
     await run();
     const keys = stateKeys(db);
     for (const gone of ['profile', 'ai.cloudConsent', 'ai.cloudCategories', 'theme', 'network.optIn']) expect(keys).not.toContain(gone);
-    expect(keys.every((k) => k.startsWith('license.'))).toBe(true);
+    expect(keys.filter((k) => k.startsWith('license.'))).toEqual([]);
+    expect(keys).toEqual([]);
   });
 
-  it('empties app_secrets of saved API keys but keeps the stored license key while the license stays', async () => {
+  it('empties app_secrets of saved API keys and of a legacy stored license key', async () => {
     const { db } = seedEverything();
     expect(secretNames(db)).toEqual(['GROQ_API_KEY', LICENSE_KEY_SECRET_NAME].sort());
     await run();
-    expect(secretNames(db)).toEqual([LICENSE_KEY_SECRET_NAME]);
+    expect(secretNames(db)).toEqual([]);
   });
 
-  it('leaves secrets.key in place (it is the MAC key of the trial, clock and activation records)', async () => {
+  it('leaves secrets.key in place (no saved key remains for it to protect)', async () => {
     const { dir } = seedEverything();
     expect(fs.existsSync(path.join(dir, 'secrets.key'))).toBe(true);
     await run();
@@ -106,75 +106,48 @@ describe('what the wipe deletes', () => {
     const result = await run();
     expect(result.counts.tables).toBeGreaterThanOrEqual(17);
     expect(result.counts.rows).toBeGreaterThan(10);
-    expect(result.counts.secrets).toBe(1);
+    expect(result.counts.secrets).toBe(2);
     expect(JSON.stringify(result)).not.toContain(SENTINEL);
   });
 });
 
-describe('what the wipe keeps', () => {
-  it('always keeps license.trial and license.clock, rows and files', async () => {
+describe('legacy license data', () => {
+  it('erases the legacy license rows and files that older versions left behind, like everything else', async () => {
     const { db, dir } = seedEverything();
-    const before = licenseRows(db);
-    expect(before['license.trial']).toBeTruthy();
-    const trialFile = fs.readFileSync(path.join(dir, 'license-trial.json'), 'utf8');
-    const clockFile = fs.existsSync(path.join(dir, 'license-clock.json')) ? fs.readFileSync(path.join(dir, 'license-clock.json'), 'utf8') : null;
-    await run({ removeLicense: true });
-    const after = licenseRows(db);
-    expect(after['license.trial']).toEqual(before['license.trial']);
-    if (before['license.clock']) expect(after['license.clock']).toEqual(before['license.clock']);
-    expect(fs.readFileSync(path.join(dir, 'license-trial.json'), 'utf8')).toBe(trialFile);
-    if (clockFile !== null) expect(fs.existsSync(path.join(dir, 'license-clock.json'))).toBe(true);
-  });
-
-  it('keeps license.trialNotices, so an erase never shows the trial notices again', async () => {
-    const { db } = seedEverything();
-    const before = licenseRows(db)['license.trialNotices'];
-    expect(before).toMatchObject({ v: 1, welcome: true });
-    await run({ removeLicense: true });
-    expect(licenseRows(db)['license.trialNotices']).toEqual(before);
-  });
-
-  it('keeps the activation (both copies, still valid Pro) unless the user opts out', async () => {
-    const { db, dir } = seedEverything();
-    const row = licenseRows(db)['license.activation'];
-    const file = fs.readFileSync(path.join(dir, 'license-activation.json'), 'utf8');
-    expect(getLicenseStatus().pro).toBe(true);
+    expect(Object.keys(licenseRows(db)).sort()).toEqual(['license.activation', 'license.clock', 'license.trial', 'license.trialNotices']);
+    for (const file of LEGACY_LICENSE_FILES) expect(fs.existsSync(path.join(dir, file)), file).toBe(true);
     await run();
-    expect(licenseRows(db)['license.activation']).toEqual(row);
-    expect(fs.readFileSync(path.join(dir, 'license-activation.json'), 'utf8')).toBe(file);
-    expect(getLicenseStatus().pro).toBe(true);
-  });
-
-  it('removes the activation (cleared record in both copies, no network) when asked, and keeps the trial', async () => {
-    const { db, dir } = seedEverything();
-    await run({ removeLicense: true });
-    expect(licenseRows(db)['license.activation'].state).toBe('cleared');
-    expect(JSON.parse(fs.readFileSync(path.join(dir, 'license-activation.json'), 'utf8')).state).toBe('cleared');
-    expect(licenseRows(db)['license.trial']).toBeTruthy();
+    expect(licenseRows(db)).toEqual({});
+    for (const file of LEGACY_LICENSE_FILES) expect(fs.existsSync(path.join(dir, file)), file).toBe(false);
     expect(secretNames(db)).toEqual([]);
-    expect(getLicenseStatus().proSource).not.toBe('license');
   });
 
-  it('cannot reset the 7 day trial: the trial stays used after an erase that also removes the license', async () => {
-    const { db, dir } = seedEverything({ activation: false });
-    const before = getLicenseStatus();
-    expect(before.trial.state).toBe('active');
-    await run({ removeLicense: true });
-    const after = getLicenseStatus();
-    expect(after.trial).toEqual(before.trial);
-    expect(after.proSource).toBe('local_trial');
-    // Still the same single trial: a relaunch after the erase never starts a fresh trial.
-    initLicense({ dataDir: dir, env: {}, getDb: () => db, allowTest: false, log: () => {} });
-    expect(getLicenseStatus().trial).toEqual(before.trial);
+  it('also removes the temp file an older version left when it was killed mid-write, and nothing that only looks similar', async () => {
+    const { dir } = seedEverything();
+    const leftovers = LEGACY_LICENSE_FILES.map((f) => `.${f}.4242.0a1b2c3d.tmp`);
+    const bystanders = ['.license-trial.json.tmp', `.license-trial.json.4242.nothex!!.tmp`, 'my.license-trial.json.4242.0a1b2c3d.tmp', '.notes.json.4242.0a1b2c3d.tmp'];
+    for (const f of [...leftovers, ...bystanders]) fs.writeFileSync(path.join(dir, f), 'x');
+    await run();
+    for (const f of leftovers) expect(fs.existsSync(path.join(dir, f)), f).toBe(false);
+    for (const f of bystanders) expect(fs.existsSync(path.join(dir, f)), f).toBe(true);
   });
 
+  it('a removeLicense option is not part of the service any more: it is ignored', async () => {
+    const { db } = seedEverything();
+    const result = await run({ removeLicense: false });
+    expect(result).not.toHaveProperty('licenseRemoved');
+    expect(licenseRows(db)).toEqual({});
+  });
+});
+
+describe('the audit marker', () => {
   it('writes the marker as the first audit entry: time and counts, no content', async () => {
     const { db } = seedEverything();
     await run();
     const { entries: rows } = await listAudit({ db, limit: 10 });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ kind: 'auth', feature: 'data_erased', status: 'ok', context: 'data erased at 2026-10-05T12:30:00.000Z' });
-    expect(Object.keys(rows[0].meta).sort()).toEqual(['keys_removed', 'remove_license', 'rows', 'tables']);
+    expect(Object.keys(rows[0].meta).sort()).toEqual(['keys_removed', 'rows', 'tables']);
     expect(JSON.stringify(rows)).not.toContain(SENTINEL);
   });
 });
@@ -330,7 +303,6 @@ describe('atomicity', () => {
     const activation = fs.readFileSync(path.join(dir, 'license-activation.json'), 'utf8');
     const error = await run({
       deleteBackups: true,
-      removeLicense: true,
       hooks: {
         afterWipe: () => {
           expect(rowCounts(db).notes).toBe(0); // the deletes really ran before the failure
@@ -344,7 +316,6 @@ describe('atomicity', () => {
     expect(secretNames(db)).toEqual(secrets);
     expect(fs.readFileSync(path.join(dir, 'license-activation.json'), 'utf8')).toBe(activation);
     expect(fs.existsSync(path.join(backupsDir(), `burrow-${id}.db`))).toBe(true);
-    expect(getLicenseStatus().pro).toBe(true);
     expect(select('audit_log', { columns: ['feature'], db }).map((r) => r.feature)).not.toContain('data_erased');
   });
 
@@ -377,7 +348,6 @@ describe('atomicity', () => {
     const seen = [];
     const error = await run({
       deleteBackups: true,
-      removeLicense: true,
       checkpoint: (handle) => {
         seen.push('checkpoint');
         expect(handle).toBe(db);
@@ -387,12 +357,11 @@ describe('atomicity', () => {
     expect(error).toMatchObject({ code: 'erase_incomplete', status: 500 });
     expect(seen.length).toBeGreaterThanOrEqual(2);
     expect(rowCounts(db).notes).toBe(0);
-    // Leftovers, backups and the license were still handled.
+    // Leftovers and backups were still handled.
     expect(fs.existsSync(path.join(dir, 'burrow.db.pre-v2.bak'))).toBe(false);
     expect(fs.existsSync(path.join(backupsDir(), `burrow-${id}.db`))).toBe(false);
-    expect(licenseRows(db)['license.activation'].state).toBe('cleared');
     // With a normal checkpoint the same call completes.
-    await run({ deleteBackups: true, removeLicense: true });
+    await run({ deleteBackups: true });
   });
 
   it('runs the compaction before the file steps: a file step that fails cannot skip it', async () => {
@@ -411,8 +380,8 @@ describe('atomicity', () => {
     for (const bytes of rawDbBytes(dir)) expect(bytes.includes(Buffer.from(SENTINEL))).toBe(false);
   });
 
-  it('one failing file step does not stop the others (backups and the license are still handled)', async () => {
-    const { db, dir } = seedEverything();
+  it('one failing file step does not stop the others (the backups are still handled)', async () => {
+    const { dir } = seedEverything();
     const id = (await createBackup({ kind: 'manual' })).meta.id;
     fs.mkdirSync(path.join(dir, 'restore-aside'));
     const failing = createFsOps({
@@ -421,10 +390,9 @@ describe('atomicity', () => {
         return createFsOps().rm(target, opts);
       },
     });
-    const error = await run({ fsOps: failing, deleteBackups: true, removeLicense: true }).catch((e) => e);
+    const error = await run({ fsOps: failing, deleteBackups: true }).catch((e) => e);
     expect(error).toMatchObject({ code: 'erase_incomplete' });
     expect(fs.existsSync(path.join(backupsDir(), `burrow-${id}.db`))).toBe(false);
-    expect(licenseRows(db)['license.activation'].state).toBe('cleared');
   });
 
   it('keeps the backups moved aside by an import when their folder cannot be read (EPERM): erase_incomplete, nothing deleted', async () => {
@@ -486,7 +454,7 @@ describe('atomicity', () => {
 });
 
 describe('the sentinel is gone from every file', () => {
-  const KEPT_FILES = ['license-activation.json', 'license-trial.json', 'license-clock.json', 'secrets.key'];
+  const KEPT_FILES = ['secrets.key'];
 
   it('covers every text, json and text[] column of every table (only constraint-limited columns are skipped)', async () => {
     seedEverything();
@@ -504,7 +472,7 @@ describe('the sentinel is gone from every file', () => {
     }
   });
 
-  it('leaves the sentinel in no file of the data folder except backups/ and the kept license and trial files', async () => {
+  it('leaves the sentinel in no file of the data folder except backups/ and secrets.key', async () => {
     const { dir } = seedEverything();
     plantSentinelEverywhere();
     const backupId = (await createBackup({ kind: 'manual' })).meta.id;
@@ -525,13 +493,6 @@ describe('the sentinel is gone from every file', () => {
     await createBackup({ kind: 'manual' });
     await run({ deleteBackups: true });
     expect(filesContaining(dir, SENTINEL, { skipFiles: KEPT_FILES })).toEqual([]);
-  });
-
-  it('with the license removed too, the old activation row is not left in the database or its WAL', async () => {
-    const { dir } = seedEverything();
-    plantSentinelEverywhere();
-    await run({ removeLicense: true, deleteBackups: true });
-    expect(filesContaining(dir, SENTINEL, { skipFiles: ['license-trial.json', 'license-clock.json', 'secrets.key'] })).toEqual([]);
   });
 });
 

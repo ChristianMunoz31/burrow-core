@@ -51,13 +51,13 @@ const preload = (file) => pathToFileURL(path.join(SUPPORT, file)).href;
  *   scheduler?: boolean,
  *   firstRun?: boolean,
  *   fakeChat?: (body: object) => unknown,
- *   preseed?: { trialEnded?: boolean, briefingToday?: boolean } | null,
+ *   preseed?: { briefingToday?: boolean } | null,
  *   distDir?: string,
  * }} [opts] `distDir` is the built client the server serves (BURROW_DIST_DIR in the child env). Default: the
  *   BURROW_E2E_DIST_DIR env var, else `<repo>/dist`; an explicit option wins over the env var. `firstRun` sets no product config at all (no BURROW_DATA_DIR, BURROW_HOST,
  *   BURROW_SCHEDULER or opt-ins; only BURROW_PORT), so the server uses its per-OS default data dir,
  *   which the fake home turns into a folder inside temp. `preseed` writes test-only state before the start
- *   (e2e/support/preseed.mjs: an ended trial, today's briefing).
+ *   (e2e/support/preseed.mjs: today's briefing).
  */
 export async function startBurrow({ seed = false, ollama = 'dead', fixedNow = null, scheduler = false, firstRun = false, fakeChat, preseed = null, distDir } = {}) {
   if (!OLLAMA_MODES.includes(ollama)) throw new Error(`Unknown ollama mode: ${String(ollama)}`);
@@ -127,7 +127,7 @@ export async function startBurrow({ seed = false, ollama = 'dead', fixedNow = nu
     }
 
     if (preseed) {
-      // Under the same fixed clock as the server, so an ended trial is also over at the server's "now".
+      // Under the same fixed clock as the server, so the briefing time matches the server's "now".
       const args = [...(fixedNow ? ['--import', preload('fixedClock.mjs')] : []), path.join(SUPPORT, 'preseed.mjs'), JSON.stringify(preseed)];
       const res = spawnSync(process.execPath, args, { cwd: REPO_ROOT, env, stdio: 'pipe', shell: false, encoding: 'utf8' });
       if (res.status !== 0) throw new Error(`Preseed failed (exit ${res.status ?? 'signal'}): ${res.stderr || res.stdout}`);

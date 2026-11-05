@@ -1,22 +1,27 @@
-// The one menu (docs/design/nav-sections-2026-10.md, Update 2026-10-10): Home, the Budget, Productivity
-// and Health sections as dropdowns (the current page's section open by default, each toggle remembered
-// on this device), a divider and Calendar; arrow keys walk the visible rows and headers;
+// The one menu (docs/design/nav-sections-2026-10.md, updated by #108): Home and Calendar, then the Financials,
+// Health and Productivity sections as dropdowns (the current page's section open by default, each toggle
+// remembered on this device), with no divider; arrow keys walk the visible rows and headers;
 // Alt+1 / Alt+2 and the palette's Switch to are gone; /weather lands on Home; Home through the
 // wordmark and Settings through the gear; and nothing asks for the old `workspace` row.
 import { test, expect, useBurrow } from '../support/fixtures.js';
 import { nav, topBar } from '../pages/nav.js';
 
-useBurrow({ seed: true, ollama: 'fake', preseed: { trialEnded: true } });
+useBurrow({ seed: true, ollama: 'fake' });
 
 const heading = (page, name) => page.getByRole('heading', { level: 2, name, exact: true }).first();
 
-const SECTIONS = ['Budget', 'Productivity', 'Health'];
+const SECTIONS = ['Financials', 'Health', 'Productivity'];
 // Every section expanded.
 const MENU = [
   'Home',
-  '#Budget',
+  'Calendar',
+  '#Financials',
   'Budget',
   'Subscriptions',
+  '#Health',
+  'Journal',
+  'Habits',
+  'Sleep & activity',
   '#Productivity',
   'Todos',
   'Notes',
@@ -24,12 +29,6 @@ const MENU = [
   'Countdowns',
   'Bookmarks',
   'Folders',
-  '#Health',
-  'Journal',
-  'Habits',
-  'Sleep & activity',
-  '---',
-  'Calendar',
 ];
 
 /** Every request the page makes for the old `workspace` app_state row, from the moment this is called. */
@@ -41,7 +40,7 @@ function watchWorkspaceRequests(page) {
   return urls;
 }
 
-/** The rows of the open menu in order: link names, '#Section' for section headers and '---' for the divider. */
+/** The rows of the open menu in order: link names and '#Section' for section headers (the menu has no divider). */
 async function rows(list) {
   return list.locator('a, h3, hr').evaluateAll((els) =>
     els.map((el) => {
@@ -52,7 +51,7 @@ async function rows(list) {
   );
 }
 
-/** { Budget: bool, Productivity: bool, Health: bool } from the headers' aria-expanded. */
+/** { Financials: bool, Health: bool, Productivity: bool } from the headers' aria-expanded. */
 async function expanded(n) {
   const out = {};
   for (const name of SECTIONS) out[name] = (await n.sectionHeader(name).getAttribute('aria-expanded')) === 'true';
@@ -66,17 +65,16 @@ test('the menu opens with only the current section expanded; expanded, it lists 
   const n = nav(page);
   const list = await n.openDrawer();
   // Default: the section of the current page is open, the others are one header row each.
-  expect(await expanded(n)).toEqual({ Budget: false, Productivity: false, Health: true });
+  expect(await expanded(n)).toEqual({ Financials: false, Health: true, Productivity: false });
   expect(await rows(list)).toEqual([
     'Home',
-    '#Budget',
-    '#Productivity',
+    'Calendar',
+    '#Financials',
     '#Health',
     'Journal',
     'Habits',
     'Sleep & activity',
-    '---',
-    'Calendar',
+    '#Productivity',
   ]);
   await expect(n.drawerSection('Health').getByRole('link', { name: 'Journal', exact: true })).toHaveAttribute(
     'aria-current',
@@ -90,9 +88,9 @@ test('the menu opens with only the current section expanded; expanded, it lists 
 
   await n.openAllSections();
   expect(await rows(list)).toEqual(MENU);
-  await expect(list.getByRole('separator')).toHaveCount(1);
+  await expect(list.getByRole('separator')).toHaveCount(0);
   await expect(page.getByRole('dialog').getByRole('group')).toHaveCount(3);
-  await expect(n.drawerSection('Budget').getByRole('link')).toHaveText(['Budget', 'Subscriptions']);
+  await expect(n.drawerSection('Financials').getByRole('link')).toHaveText(['Budget', 'Subscriptions']);
   await expect(n.drawerSection('Productivity').getByRole('link')).toHaveText([
     'Todos',
     'Notes',
@@ -121,28 +119,28 @@ test('a header toggles its section, and the choice survives a reload', async ({ 
   const n = nav(page);
   const list = await n.openDrawer();
   // Home is in no section: everything starts collapsed.
-  expect(await expanded(n)).toEqual({ Budget: false, Productivity: false, Health: false });
+  expect(await expanded(n)).toEqual({ Financials: false, Health: false, Productivity: false });
   await expect(list.getByRole('link')).toHaveText(['Home', 'Calendar']);
 
   await n.sectionHeader('Productivity').click();
   await expect(n.sectionHeader('Productivity')).toHaveAttribute('aria-expanded', 'true');
   await expect(n.drawerSection('Productivity').getByRole('link')).toHaveCount(6);
-  await n.sectionHeader('Budget').click();
-  await n.sectionHeader('Budget').click();
-  await expect(n.sectionHeader('Budget')).toHaveAttribute('aria-expanded', 'false');
-  await expect(n.drawerSection('Budget').getByRole('link')).toHaveCount(0);
+  await n.sectionHeader('Financials').click();
+  await n.sectionHeader('Financials').click();
+  await expect(n.sectionHeader('Financials')).toHaveAttribute('aria-expanded', 'false');
+  await expect(n.drawerSection('Financials').getByRole('link')).toHaveCount(0);
 
   await page.reload();
   await expect(heading(page, 'Overview')).toBeVisible();
   await n.openDrawer();
-  expect(await expanded(n)).toEqual({ Budget: false, Productivity: true, Health: false });
+  expect(await expanded(n)).toEqual({ Financials: false, Health: false, Productivity: true });
 
   // Going to a page opens its section next time and keeps the other choices.
   await n.closeDrawer();
   await page.goto('/habits');
   await expect(heading(page, 'Habits')).toBeVisible();
   await n.openDrawer();
-  expect(await expanded(n)).toEqual({ Budget: false, Productivity: true, Health: true });
+  expect(await expanded(n)).toEqual({ Financials: false, Health: true, Productivity: true });
   await expect(n.drawerSection('Health').getByRole('link', { name: 'Habits', exact: true })).toBeFocused();
 });
 
@@ -167,29 +165,31 @@ test('arrow keys walk the visible rows and headers, skip collapsed rows, and Ent
   const home = list.getByRole('link', { name: 'Home', exact: true });
   await expect(home).toBeFocused();
   const calendar = list.getByRole('link', { name: 'Calendar', exact: true });
-  for (const target of [n.sectionHeader('Budget'), n.sectionHeader('Productivity'), n.sectionHeader('Health'), calendar]) {
+  for (const target of [calendar, n.sectionHeader('Financials'), n.sectionHeader('Health'), n.sectionHeader('Productivity')]) {
     await page.keyboard.press('ArrowDown');
     await expect(target).toBeFocused();
   }
   await page.keyboard.press('ArrowDown');
   await expect(home).toBeFocused();
 
-  // Enter opens Budget, Space opens Health; the arrows now reach their rows.
+  // Enter opens Financials, Space opens Health; the arrows now reach their rows.
   await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(n.sectionHeader('Financials')).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(n.sectionHeader('Budget')).toHaveAttribute('aria-expanded', 'true');
+  await expect(n.sectionHeader('Financials')).toHaveAttribute('aria-expanded', 'true');
   await n.sectionHeader('Health').focus();
   await page.keyboard.press('Space');
   await expect(n.sectionHeader('Health')).toHaveAttribute('aria-expanded', 'true');
   await page.keyboard.press('Home');
-  const stops = ['Home', '#Budget', 'Budget', 'Subscriptions', '#Productivity', '#Health', 'Journal', 'Habits', 'Sleep & activity', 'Calendar'];
+  const stops = ['Home', 'Calendar', '#Financials', 'Budget', 'Subscriptions', '#Health', 'Journal', 'Habits', 'Sleep & activity', '#Productivity'];
   for (const name of stops.slice(1)) {
     await page.keyboard.press('ArrowDown');
     const target = name.startsWith('#') ? n.sectionHeader(name.slice(1)) : list.getByRole('link', { name, exact: true });
     await expect(target).toBeFocused();
   }
   await page.keyboard.press('End');
-  await expect(calendar).toBeFocused();
+  await expect(n.sectionHeader('Productivity')).toBeFocused();
   await page.keyboard.press('ArrowUp');
   await expect(list.getByRole('link', { name: 'Sleep & activity', exact: true })).toBeFocused();
   await n.closeDrawer();

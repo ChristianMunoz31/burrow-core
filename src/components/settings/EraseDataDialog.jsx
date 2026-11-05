@@ -59,7 +59,6 @@ export default function EraseDataDialog({ onClose, finalFocusRef }) {
   const [exportFirst, setExportFirst] = useState(true);
   const [understand, setUnderstand] = useState(false);
   const [deleteBackups, setDeleteBackups] = useState(false);
-  const [removeLicense, setRemoveLicense] = useState(false);
   const [password, setPassword] = useState('');
   const [phrase, setPhrase] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -85,7 +84,7 @@ export default function EraseDataDialog({ onClose, finalFocusRef }) {
         }
       }
       const { token } = await requestEraseToken();
-      await eraseAllData({ token, phrase, removeLicense, deleteBackups, ...(needsPassword ? { password } : {}) });
+      await eraseAllData({ token, phrase, deleteBackups, ...(needsPassword ? { password } : {}) });
     } catch (e) {
       if (e?.code === ERASE_INCOMPLETE_CODE) {
         // The data is already gone, so there is nothing to retry (a retry would export an empty app again).
@@ -111,10 +110,6 @@ export default function EraseDataDialog({ onClose, finalFocusRef }) {
   };
 
   const kept = [
-    removeLicense
-      ? 'Your license will be removed from this computer.'
-      : 'Your license activation (it includes your purchase email), unless you remove it.',
-    'Your Pro trial status is kept.',
     deleteBackups
       ? 'All backups will be deleted too, so nothing can restore your data.'
       : `Your finished backups stay in ${where} and can restore everything.`,
@@ -143,9 +138,6 @@ export default function EraseDataDialog({ onClose, finalFocusRef }) {
               hint="Backups are the only way to get your data back after erasing."
             >
               Also delete all backups on this computer
-            </Check>
-            <Check checked={removeLicense} onChange={setRemoveLicense}>
-              Also remove my license from this computer
             </Check>
           </div>
           {needsPassword && (

@@ -1,5 +1,5 @@
 // POST /api/jarvis/advice with the REAL advisor service and cache, through the real server.js, a fake
-// Ollama behind node-fetch and the Pro switch: the insight card cache against the Free/Pro gate,
+// Ollama behind node-fetch and the insight card cache,
 // audit rows, ?fresh=1, and a closed request. No real Ollama.
 import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
@@ -7,7 +7,6 @@ import request from 'supertest';
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 vi.mock('../auditHook.js', () => ({ recordAudit: vi.fn(async () => {}), setAuditSink: vi.fn() }));
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 
 import fetch from 'node-fetch';
 import { installFakeOllama, textReply } from './helpers/fakeOllama.js';
@@ -15,7 +14,6 @@ import { __resetAiForTests } from '../ai/index.js';
 import { recordAudit } from '../auditHook.js';
 import { clearAdviceCache } from '../javi/adviceCache.js';
 import { __resetDataGenerationForTests } from '../dataGeneration.js';
-import { FREE, PRO, resetPro, setEntitlements } from './helpers/pro.js';
 
 const URL_PATH = '/api/jarvis/advice';
 const CONTEXT = '{"page":"todos","today":"2026-10-09","data":{"open":3},"localTime":"10:00"}';
@@ -49,14 +47,12 @@ beforeEach(() => {
   __resetDataGenerationForTests();
   clearAdviceCache();
   recordAudit.mockClear();
-  setEntitlements(FREE);
   useReplies();
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
 });
 afterEach(() => {
-  resetPro();
   vi.restoreAllMocks();
 });
 
@@ -140,40 +136,34 @@ describe('Free single-shot and the insight card cache', () => {
   });
 });
 
-describe('a request with messages and the Pro gate', () => {
-  it('Free with messages is 403 pro_required even when a single-shot answer for that page is cached, with no model call', async () => {
+describe('a request with messages (no tier gate)', () => {
+  it('a follow-up is never 403, even when a single-shot answer for that page is cached: it runs the model', async () => {
     await post(single());
     expect(advice()).toBe(1);
     const sse = await post(followUp());
-    expect(sse.status).toBe(403);
-    expect(sse.body).toMatchObject({ error: 'pro_required', feature: 'javi_conversation' });
+    expect(sse.status).toBe(200);
     const json = await post(followUp(), { headers: {} });
-    expect(json.status).toBe(403);
-    expect(json.body.error).toBe('pro_required');
-    expect(advice()).toBe(1);
-    expect(recordAudit).toHaveBeenCalledTimes(1);
+    expect(json.status).not.toBe(403);
+    expect(advice()).toBe(3);
   });
 
-  it('?fresh=1 on Free does not bypass the Pro gate for multi-turn', async () => {
+  it('?fresh=1 does not change that: a follow-up is answered', async () => {
     const res = await post(followUp(), { path: `${URL_PATH}?fresh=1` });
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe('pro_required');
-    expect(advice()).toBe(0);
-    expect(recordAudit).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(advice()).toBe(1);
   });
 
   it.each([
     ['a thread key in the body', { threadId: 'abc' }],
     ['a history key in the body', { history: [{ role: 'user', content: 'hi' }] }],
-  ])('Free with %s is also gated', async (_label, extra) => {
+  ])('%s is never 403', async (_label, extra) => {
     await post(single());
     const res = await post(single(extra));
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe('pro_required');
+    expect(res.status).not.toBe(403);
+    expect(res.body?.error).not.toBe('pro_required');
   });
 
-  it('Pro with messages never hits the cache, runs the model and writes nothing for the card', async () => {
-    setEntitlements(PRO);
+  it('messages never hit the cache, runs the model and writes nothing for the card', async () => {
     await post(single());
     expect(advice()).toBe(1);
     const follow = await post(followUp());
@@ -190,7 +180,7 @@ describe('a request with messages and the Pro gate', () => {
     expect(advice()).toBe(2); // the follow-up stored no card for the single-shot request
   });
 
-  it('an empty messages array is still single-shot (Free allowed, cacheable)', async () => {
+  it('an empty messages array is still single-shot (cacheable)', async () => {
     const a = await post(single({ messages: [] }));
     expect(a.status).toBe(200);
     await post(single({ messages: [] }));

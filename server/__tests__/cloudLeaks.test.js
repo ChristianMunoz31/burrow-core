@@ -6,7 +6,6 @@
 // sk-test-fake); nothing real is contacted.
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 // Pro is on for this file (the Pro gate itself is covered in proGating.test.js).
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import request from 'supertest';
 import { strToU8, zipSync } from 'fflate';
 

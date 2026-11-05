@@ -6,7 +6,7 @@ import { BTN } from './pillStyles';
 
 const STATUS_KEY = ['backups', 'direct-import'];
 const INTRO =
-  'You have used Burrow from the website before. Import copies your data from that Burrow into this one: your entries, backups and settings, and your trial or license. It only copies. Your other Burrow is not changed, moved or deleted. The copy is a snapshot from the moment you click: data you add to your other Burrow later is not included.';
+  'You have used Burrow from the website before. Import copies your data from that Burrow into this one: your entries, backups and settings. It only copies. Your other Burrow is not changed, moved or deleted. The copy is a snapshot from the moment you click: data you add to your other Burrow later is not included.';
 const CLOSE_FIRST = 'Close your other Burrow first (File, then Quit), then choose Import.';
 const QUESTION =
   'Copy your data from your other Burrow into this Burrow? Anything you added here since installing is kept in a safety folder, not deleted.';

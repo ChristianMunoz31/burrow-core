@@ -4,7 +4,6 @@
 // file never fails the scan, an unreadable document is not parsed again until it changes, and cancelling a scan
 // terminates an in-flight worker.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 vi.mock('../folders/extract.js', async (importOriginal) => {

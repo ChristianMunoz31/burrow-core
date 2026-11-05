@@ -6,7 +6,7 @@
 // Flow: copy burrow.db (+ -wal, -journal when present, never -shm) into a private folder inside the Dev
 // backups folder, check by stat that stable did not change meanwhile (retry otherwise), let SQLite settle
 // the copy there (WAL recovery / hot journal), take a normalized VACUUM INTO snapshot of it (saved keys
-// emptied), hand that to the existing restore flow (safety backup, carried settings and license clock,
+// emptied), hand that to the existing restore flow (safety backup, carried settings,
 // journaled swap). Everything fails closed: Dev data is replaced only by a fully verified copy.
 import crypto from 'node:crypto';
 import path from 'node:path';

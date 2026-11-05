@@ -1,6 +1,6 @@
 // The Folders job runner. One job runs at a time across all folders (FIFO queue, at most 20 waiting, at most one
-// queued or running job per folder). A scan lists the files (read-only, incremental), writes summaries, and for
-// Pro builds the local question index; a report job writes the cross-file report.
+// queued or running job per folder). A scan lists the files (read-only, incremental), writes summaries, and with
+// the private module the local question index; a report job writes the cross-file report.
 //
 // Safety rules this file keeps:
 //  - Reset safe: every DB write batch and every phase boundary calls checkpoint(), which stops the job when it was
@@ -24,7 +24,6 @@ import {
 import { recordAudit } from '../auditHook.js';
 import { captureDataGeneration, onDataReset } from '../dataGeneration.js';
 import { isDbError, yieldToLoop, withTransaction } from '../db/index.js';
-import { ProRequiredError, assertPro, proAccess } from '../pro.js';
 import { EXT_KINDS, FOLDER_MESSAGES, FolderError, LIMITS, isDocumentExt } from './constants.js';
 import { docParsingEnabled } from './docGate.js';
 import { createDocTextCache, readTextFile } from './extract.js';
@@ -355,8 +354,6 @@ async function runJob(job) {
       else conclude(job, 'interrupted', stopError(stop.kind));
     } else if (err instanceof FolderError) {
       conclude(job, 'failed', { code: err.code, message: err.message });
-    } else if (err instanceof ProRequiredError) {
-      conclude(job, 'failed', { code: 'pro_required', message: err.publicMessage });
     } else if (job.kind === 'report') {
       const c = classifyAiError(err);
       if (!(err instanceof AiUnavailableError || err instanceof AiBusyError || err instanceof CloudScopeError)) {
@@ -788,7 +785,7 @@ async function indexPhase(ctx) {
   const { job } = ctx;
   setPhase(job, 'indexing');
   checkpoint(job);
-  if (!hooks.index || !proAccess('folder_qa').allowed) {
+  if (!hooks.index) {
     ctx.indexSkipped = 'not_pro';
     return;
   }
@@ -834,8 +831,6 @@ async function auditScan(ctx) {
 
 async function runReport(job) {
   setPhase(job, 'reporting');
-  // Pro may have lapsed while the job waited in the queue.
-  assertPro('folder_report');
   if (!hooks.report) throw new FolderError('folder_failed');
   await hooks.report(reportApi(job));
 }

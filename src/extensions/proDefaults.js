@@ -41,7 +41,7 @@ export const noAgentToolLabel = () => '';
 
 /**
  * Default `useInsightsExplain`: nothing to explain in this build. `explain()` only sets `proAttempted`, so the
- * card shows its existing Pro notice (ProGateNotice), exactly as a Free user's click does today.
+ * card shows the not-included notice (NotIncludedNotice).
  */
 export function useNoInsightsExplain() {
   const [proAttempted, setProAttempted] = useState(false);

@@ -3,7 +3,6 @@ import BurgerMenu from './BurgerMenu';
 import TopBar from './TopBar';
 import LazyCommandPalette from '../palette/LazyCommandPalette';
 import JaviAdvisor from '../javi/JaviAdvisor';
-import TrialNotice from '../license/TrialNotice';
 import { PageContextProvider } from '../../contexts/PageContextContext';
 import { useJaviSettings } from '../../hooks/useJaviSettings';
 import { resolveJaviBarPageKey } from '../../constants/javiPages';
@@ -29,7 +28,6 @@ export default function AppShell({ children }) {
         <BurgerMenu />
         <main tabIndex={-1} className="flex-1 min-w-0 flex flex-col focus:outline-none">
           <TopBar />
-          <TrialNotice />
           {/* Keyed on the top-level segment so switching modules replays the
               fade/slide-in, while sub-routes within a module (e.g. /budget to
               /budget/planner) don't re-animate or remount.

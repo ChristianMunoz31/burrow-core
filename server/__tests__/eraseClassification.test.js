@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { PROTECTED_APP_STATE_KEYS } from '../import/importExport.js';
 import { TABLES, getDb } from '../db/index.js';
-import { KEPT_STATE_KEYS, TABLE_CLASS, tablesToErase } from '../erase/eraseService.js';
+import { TABLE_CLASS, tablesToErase } from '../erase/eraseService.js';
 
 import { cleanupBackupEnv } from './helpers/backupEnv.js';
 import { freshDb } from './helpers/eraseEnv.js';
@@ -31,9 +31,9 @@ describe('erase classification against a migrated database', () => {
 describe('erase classification', () => {
   it('classifies every table in db/tables.js, and only those', () => {
     const tables = Object.keys(TABLES).sort();
-    expect(Object.keys(TABLE_CLASS).sort(), 'Classify the new table in TABLE_CLASS (server/erase/eraseService.js) as erased or erased_except_kept_rows').toEqual(tables);
+    expect(Object.keys(TABLE_CLASS).sort(), 'Classify the new table in TABLE_CLASS (server/erase/eraseService.js) as erased').toEqual(tables);
     for (const [table, cls] of Object.entries(TABLE_CLASS)) {
-      expect(['erased', 'erased_except_kept_rows'], table).toContain(cls);
+      expect(cls, table).toBe('erased');
     }
   });
 
@@ -45,13 +45,13 @@ describe('erase classification', () => {
     expect(order.indexOf('jarvis_memory')).toBeLessThan(order.indexOf('jarvis_conversations'));
   });
 
-  it('keeps rows only in app_state and app_secrets', () => {
-    const partial = Object.entries(TABLE_CLASS).filter(([, c]) => c === 'erased_except_kept_rows').map(([t]) => t);
-    expect(partial.sort()).toEqual(['app_secrets', 'app_state']);
+  it('erases every row of every table: no table keeps rows, no kept state keys exist', () => {
+    expect(new Set(Object.values(TABLE_CLASS))).toEqual(new Set(['erased']));
   });
 
-  it('keeps exactly the trial, trial notices, clock and activation records in app_state, all of them protected keys', () => {
-    expect([...KEPT_STATE_KEYS].sort()).toEqual(['license.activation', 'license.clock', 'license.trial', 'license.trialNotices']);
-    for (const key of KEPT_STATE_KEYS) expect(PROTECTED_APP_STATE_KEYS.has(key), key).toBe(true);
+  it('import still skips the legacy license state keys that older versions wrote', () => {
+    for (const key of ['license.activation', 'license.clock', 'license.trial', 'license.trialNotices']) {
+      expect(PROTECTED_APP_STATE_KEYS.has(key), key).toBe(true);
+    }
   });
 });

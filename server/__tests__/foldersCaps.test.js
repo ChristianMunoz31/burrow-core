@@ -1,7 +1,6 @@
 // The scan limits (files listed, text read, file size, depth, entries, summarized files), driven with
 // tiny synthetic limits through the test seam. Each one must produce the right file statuses and `limitsHit`.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 
@@ -14,7 +13,6 @@ import { __setFolderLimitsForTests, enqueueFolderJob, waitForFolderJob } from '.
 import { __setPathOptionsForTests } from '../folders/pathSafety.js';
 import { allFileRows, getFolder } from '../folders/store.js';
 import { __setBusyDelaysForTests } from '../folders/summarize.js';
-import { FREE, resetPro, setEntitlements } from './helpers/pro.js';
 import { installFakeOllama, textReply } from './helpers/fakeOllama.js';
 import { addFolderRow, makeTmp, rmTree, useNeutralPaths, writeTree } from './helpers/foldersEnv.js';
 import { closeTestDb, createTestDb, resetDb } from './helpers/testDb.js';
@@ -59,7 +57,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   __setFolderLimitsForTests(null);
-  resetPro();
 });
 
 describe('the public limits', () => {
@@ -214,7 +211,6 @@ describe('index chunks', () => {
   const bigText = (label) => Array.from({ length: 40 }, (_v, i) => `${label} sentence number ${i} talks about gardens and soil.`).join('\n');
 
   it('without the Pro index hook there is no index and the reason is not_pro, even with Pro entitlements', async () => {
-    setEntitlements(FREE);
     writeTree(dir, { 'a.txt': bigText('alpha') });
     folder = await addFolderRow(dir);
     await scan();

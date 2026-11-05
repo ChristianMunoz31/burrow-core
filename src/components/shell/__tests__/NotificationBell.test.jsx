@@ -4,9 +4,6 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import NotificationBell from '../NotificationBell';
-import { FREE_STATE, UNKNOWN_STATE, resetEntitlementsState, setEntitlementsState } from '../../../test-utils/entitlements.js';
-
-vi.mock('../../../hooks/useEntitlements', async () => (await import('../../../test-utils/entitlements.js')).entitlementsModule());
 
 const h = vi.hoisted(() => ({
   alerts: [],
@@ -25,7 +22,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
-  resetEntitlementsState();
 });
 
 const renderBell = () =>
@@ -92,12 +88,7 @@ describe('NotificationBell tiers', () => {
     return user;
   };
 
-  it.each([
-    ['Free', FREE_STATE],
-    ['Pro', null],
-    ['unknown', UNKNOWN_STATE],
-  ])('shows the alerts and no refresh control (%s)', async (_label, state) => {
-    if (state) setEntitlementsState(state);
+  it('shows the alerts and no refresh control', async () => {
     await openBell();
     expect(screen.getByText('Two todos are overdue.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Refresh briefing' })).not.toBeInTheDocument();

@@ -1,5 +1,7 @@
 # Minimal shell: calm top bar, one-workspace drawer, Javi message bar (2026-10)
 
+> Note 2026-11-05: the trial pill and the Free versus Pro behaviour described below were removed by [ADR 0002](../adr/0002-free-for-everyone.md) (Burrow is free for everyone). Kept as design history.
+
 > Section 3 (drawer, navigation data, Javi inbox rule, Home cards) and the drawer heading part of rule 1.3 are superseded 2026-10-10 by docs/design/nav-sections-2026-10.md. The top bar (section 2) and the Javi message bar (section 4) still stand, except the inert Back placeholder on Home (2.1 row 2, 2.2), which is a dimmed, disabled Back since 2026-10-10 (Update in docs/design/nav-sections-2026-10.md).
 
 Owner request (2026-10-10, verbatim): "many ui changes needed. nav bar shouldnt have 'life' category anymore. it'll only be budget or journal and then calendar with weather. javi should be a direct message bar as if it were social media. every other item from life category go to journal. when budget mode, only budget items. when journal mode, only journal items. ... aim for minimalism, modern design."

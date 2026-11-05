@@ -1,6 +1,5 @@
-import { ProRequiredError } from '../pro.js';
 // The single definition of "can AI run right now", plus the user-facing error bodies.
-// isAiEnabled() is the license seam: every AI entry point goes through it.
+// isAiEnabled() is the one on/off seam: every AI entry point goes through it.
 
 export const MSG_AI_OFF = 'AI is turned off.';
 export const MSG_NO_MODEL =
@@ -27,9 +26,6 @@ export const HINT_AI_LAN =
 export const ollamaUnavailableMessage = (host) =>
   `Javi can't reach Ollama at ${host}. Open the Ollama app or run "ollama serve", then try again.`;
 
-// isAiEnabled() answers only "can AI run". Pro gating is a separate, capability-based check in
-// server/pro.js (requirePro / assertPro): Javi's read-only page advice stays free, while Javi
-// tools, briefings and Explain also need Pro. Order a route as requirePro, then requireAi.
 /**
  * Whether AI features may run at all. Synchronous; BURROW_AI=0 turns every AI route off.
  * @returns {boolean}
@@ -92,15 +88,11 @@ export class AiBusyError extends Error {
 export const isAiUnavailableError = (err) => err instanceof AiUnavailableError;
 
 /**
- * JSON body for an AiUnavailableError, AiBusyError or ProRequiredError (Pro ended after the route
- * gate), or null for anything else.
+ * JSON body for an AiUnavailableError or AiBusyError, or null for anything else.
  * @param {unknown} err
  * @returns {{ error: string, reason?: string, feature?: string, message: string, hint?: string } | null}
  */
 export function aiErrorBody(err) {
-  if (err instanceof ProRequiredError) {
-    return { error: 'pro_required', feature: err.feature, ...(err.reason ? { reason: err.reason } : {}), message: err.publicMessage };
-  }
   if (err instanceof AiUnavailableError) {
     return { error: err.code, reason: err.reason, message: err.publicMessage, ...(err.hint ? { hint: err.hint } : {}) };
   }

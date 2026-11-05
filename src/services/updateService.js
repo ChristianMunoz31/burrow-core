@@ -3,12 +3,10 @@ import { buildApiError } from '../utils/apiError';
 const PROXY_URL = '/api';
 
 /**
- * @typedef {'free' | 'included' | 'blocked' | 'unknown'} LicenseImpact
  * @typedef {{ status: 'store_managed' } | { status: 'dev_managed' }
  *   | { status: 'current', current: string, latest: string, channel: 'stable', source: 'manifest' | 'release', checkedAt: string }
  *   | { status: 'available', current: string, latest: string, url: string, publishedAt: string | null, channel: 'stable',
- *       source: 'manifest' | 'release', checkedAt: string, notes: string | null, canInstall: boolean, canDownload: boolean,
- *       licenseImpact: LicenseImpact, updatesUntil: string | null }
+ *       source: 'manifest' | 'release', checkedAt: string, notes: string | null, canInstall: boolean, canDownload: boolean }
  *   | { status: 'unavailable', current: string, reason: string, channel: string, checkedAt: string }} UpdateStatus
  * @typedef {{ status: 'ready', version: string, arch: 'x64' | 'arm64', fileName: string, installerUrl: string,
  *   sha256: string, sumsUrl: string, backupId: string | null }} ManualDownload

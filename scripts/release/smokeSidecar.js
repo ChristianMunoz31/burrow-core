@@ -2,7 +2,7 @@
 // does (src-tauri/src/sidecar.rs: allowlisted environment, BURROW_DESKTOP=1, per-launch 64-hex secret on
 // stdin), waits for the BURROW_READY line, then checks the desktop gate end to end:
 //   no cookie -> 401 on /api, bootstrap token (HMAC as server/desktop/auth.js computes it) -> 302 + cookie,
-//   cookie -> 200 JSON on /api/transactions and /api/license, cookie -> 404 on /api/dev/license and devTools false
+//   cookie -> 200 JSON on /api/transactions and /api/app/info, cookie -> 404 on /api/dev/status and devTools false
 //   in /api/app/info (developer tools compiled out), cookie -> 200 HTML on /,
 //   Folders documents (a synthetic PDF and DOCX extract as ok/document, a corrupt PDF is unreadable; folder removed again),
 //   then closes stdin and expects exit code 0 within 10 s.
@@ -16,7 +16,7 @@
 // (src-tauri/binaries/burrow-server-<host triple>, src-tauri/resources).
 // With --expect-pro (docs/adr/0001-open-core-split.md 3.10) it checks /api/app/info `proModule` and that
 // POST /api/insights/explain with `{}` answers 400 (Pro module present: the Pro validator runs) or 501
-// pro_not_included (absent) on the fresh trial data dir.
+// pro_not_included (absent) on the fresh data dir.
 // With --expect-distribution store it also checks the ready line, /api/app/info and that the update check answers
 // store_managed (no GitHub call), i.e. the Microsoft Store flavor.
 // With --expect-data-location the sidecar is started WITHOUT BURROW_DATA_DIR so that it resolves its own default folder inside
@@ -380,7 +380,7 @@ export async function runSmoke({
     const cookie = extractCookie(boot.headers.getSetCookie());
     check(cookie, `bootstrap did not set the ${COOKIE_NAME} cookie`);
 
-    for (const route of ['/api/transactions', '/api/license']) {
+    for (const route of ['/api/transactions', '/api/app/info']) {
       const res = await get(route, { headers: { cookie } });
       check(res.status === 200, `${route} returned ${res.status}, expected 200`);
       check(isJsonType(res.headers.get('content-type')), `${route} did not return JSON`);
@@ -388,14 +388,14 @@ export async function runSmoke({
       log(`${route} -> 200 JSON`);
     }
 
-    // The developer tier switcher must be compiled out of a stable sidecar: no route, and the app info says so.
-    const devRoute = await get('/api/dev/license', { headers: { cookie } });
-    check(devRoute.status === 404, `/api/dev/license returned ${devRoute.status}, expected 404 (developer tools must not be in a stable sidecar)`);
+    // The developer tools must be compiled out of a stable sidecar: no route, and the app info says so.
+    const devRoute = await get('/api/dev/status', { headers: { cookie } });
+    check(devRoute.status === 404, `/api/dev/status returned ${devRoute.status}, expected 404 (developer tools must not be in a stable sidecar)`);
     await devRoute.arrayBuffer();
     const infoRes = await get('/api/app/info', { headers: { cookie } });
     check(infoRes.status === 200, `/api/app/info returned ${infoRes.status}, expected 200`);
     check(JSON.parse(await infoRes.text())?.data?.devTools === false, '/api/app/info reports devTools other than false in a stable sidecar');
-    log('/api/dev/license -> 404, devTools false');
+    log('/api/dev/status -> 404, devTools false');
     if (expectPro) await checkProModule({ get, cookie, base, expectPro, log });
     if (expectDistribution) {
       const info = await get('/api/app/info', { headers: { cookie } });
@@ -439,7 +439,7 @@ export async function runSmoke({
 
 /**
  * The Pro module check: `proModule` in /api/app/info and the explain route. With the module the Pro validator answers
- * 400 for an empty body; without it core answers 501 pro_not_included (the fresh data dir has an active trial).
+ * 400 for an empty body; without it core answers 501 pro_not_included (there is no gate in front of the route).
  */
 async function checkProModule({ get, cookie, base, expectPro, log }) {
   const info = await get('/api/app/info', { headers: { cookie } });

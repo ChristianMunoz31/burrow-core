@@ -1,6 +1,6 @@
 // Store policy 11.16 "Report content". The link opens the default mail app with an empty template:
 // nothing from the conversation is added, and nothing is sent by Burrow. The address must equal
-// supportContact in config/store.json (a test checks it) and the shell's Help > Report content.
+// supportContact in config/support.json (a test checks it) and the shell's Help > Report content.
 export const REPORT_EMAIL = 'burrowsupport@gmail.com';
 export const REPORT_SUBJECT = 'Burrow: report AI content';
 export const REPORT_BODY =

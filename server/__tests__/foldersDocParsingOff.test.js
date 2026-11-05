@@ -15,7 +15,6 @@ vi.mock('node:worker_threads', async (importOriginal) => {
   }
   return { ...actual, Worker: CountingWorker };
 });
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 
@@ -34,7 +33,6 @@ import { previewFile } from '../folders/preview.js';
 import { allFileRows, getFolder, updateFile } from '../folders/store.js';
 import { __setBusyDelaysForTests } from '../folders/summarize.js';
 import { installFakeOllama, textReply } from './helpers/fakeOllama.js';
-import { FREE, PRO, resetPro, setEntitlements } from './helpers/pro.js';
 import { makeTmp, neutralPathOptions, rmTree, writeTree } from './helpers/foldersEnv.js';
 import { makeDocx, makePdf } from './helpers/synthDocs.js';
 import { closeTestDb, createTestDb, resetDb } from './helpers/testDb.js';
@@ -87,7 +85,6 @@ afterAll(() => {
 });
 beforeEach(() => {
   resetDb(db);
-  setEntitlements(FREE);
   __setPathOptionsForTests(neutralPathOptions(root));
   __resetAiForTests();
   fetch.mockReset();
@@ -105,13 +102,11 @@ afterEach(async () => {
   cancelAllFolderJobs('shutdown');
   await drainFolderJobs({ timeoutMs: 2000 });
   __setParserWorkerFactoryForTests(null);
-  resetPro();
   vi.restoreAllMocks();
 });
 
 describe('document parsing off (the default)', () => {
   it('scans and summarizes a folder, lists PDF and DOCX as unsupported and creates no Worker', async () => {
-    setEntitlements(PRO);
     writeTree(dir, {
       'note.txt': 'A plain note about the migration plan.\n',
       'report.pdf': makePdf([['Report page one'], ['Report page two']]),

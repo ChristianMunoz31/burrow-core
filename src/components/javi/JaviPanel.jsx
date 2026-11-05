@@ -17,14 +17,13 @@ import {
   AGENT_UNREACHABLE_MESSAGE,
   ConfirmActionCard,
   JaviComposer,
+  PRO_UI_INCLUDED,
   agentToolLabel,
 } from '../../extensions/proExtensions';
 import { useJarvisStatus } from '../../hooks/useJarvisStatus';
 import AiUnavailable from '../shared/AiUnavailable';
-import { PRO_REQUIRED, isAiUnavailableError } from '../../utils/apiError';
-import { isFreeUi, useEntitlements, useRefreshEntitlements } from '../../hooks/useEntitlements';
-import ProGateNotice from '../license/ProGateNotice';
-import BuyProLink from '../license/BuyProLink';
+import { isAiUnavailableError } from '../../utils/apiError';
+import NotIncludedNotice from '../shared/NotIncludedNotice';
 import { stripDashes } from '../../utils/javiDashes';
 import { openTransactionImport } from '../budget/openTransactionImport';
 
@@ -40,19 +39,17 @@ const ICON_BTN =
 
 const noop = () => {};
 
-const HINT_LINK =
-  'font-semibold text-slate-slate100 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:[outline-color:var(--focus-ring)]';
-
 /**
  * Non-modal dialog: no overlay, no scroll lock, no focus trap. Escape is handled on the
  * panel itself so it cannot fight Modal's document-level handling.
  *
  * One scroll holds both page advice (`thread`, from useJaviSession) and free-form turns with
  * their change requests (`agent`, from useJaviAgent). Typed questions go to `onSend`; the
- * suggestion chips go to `onSuggestion` (advice). On Free the panel is one read-only advice card:
- * no chips, composer or New conversation button, and `askBlocked` (a palette question) shows the Pro notice.
+ * suggestion chips go to `onSuggestion` (advice follow-ups, core code in every build). The composer and the
+ * New conversation button come from the private module and show only when it is compiled in (`PRO_UI_INCLUDED`);
+ * without it `askBlocked` (a palette question) shows the not-included notice.
  * `rows` are the "New for you" items (useJaviInbox), shown in a strip outside the scroll: between the header and the
- * body on Pro, at the bottom edge on Free (so the insight comes first in tab order). A `focusSeq` bump moves focus
+ * body when the module is included, at the bottom edge otherwise (so the insight comes first in tab order). A `focusSeq` bump moves focus
  * to the composer, else Close (a strip row opened the panel on another page). `barShown` (the Javi bar is drawn) makes the header button "Collapse Javi" with a
  * chevron; without the bar it is "Close Javi" with an X.
  * @param {{ id: string, pageKey: string, pageLabel: string, thread: object, suggestions: readonly string[],
@@ -88,24 +85,6 @@ export default function JaviPanel({
   const sourceId = useId();
   const newId = useId();
   const { status } = useJarvisStatus();
-  const entitlements = useEntitlements();
-  const refreshEntitlements = useRefreshEntitlements();
-  // Per capability, so a Store license past its update window that lacks conversations gets the one-insight panel.
-  // javi_tools was introduced before javi_conversation, so a license that has conversations also has tools.
-  // A build without the Pro UI is always Free here (isFreeUi): the composer and confirm cards are not compiled in.
-  const free = isFreeUi(entitlements, 'javi_conversation');
-  // Typed questions, follow-ups and suggestion chips are Pro; only the one automatic advice card per page is free.
-  const proBlocked = isFreeUi(entitlements, 'javi_tools') && agent.errorCode === PRO_REQUIRED;
-  // The server said Pro is required: re-read the license so a stale Pro cache is corrected and the notice can show.
-  const proRequiredFromServer = agent.errorCode === PRO_REQUIRED;
-  useEffect(() => {
-    if (proRequiredFromServer) refreshEntitlements();
-  }, [proRequiredFromServer, refreshEntitlements]);
-  // Same for a follow-up the server refused (a stale Pro cache sent one): re-read the license.
-  const adviceProRequired = thread.error?.code === PRO_REQUIRED;
-  useEffect(() => {
-    if (adviceProRequired) refreshEntitlements();
-  }, [adviceProRequired, refreshEntitlements]);
   // The hint is latched when it first appears so it stays for this panel session even after the
   // status query learns it was shown.
   const [hint, setHint] = useState('idle');
@@ -116,15 +95,7 @@ export default function JaviPanel({
   const endRef = useRef(null);
   const advising = thread.status === 'loading';
   const loading = advising || agent.running;
-  // Free shows one advice card: the latest automatic advice, never a follow-up turn.
-  const timeline = useMemo(
-    () =>
-      buildTimeline(
-        free ? { ...thread, messages: thread.messages.filter((m) => m.role === 'assistant' && m.auto).slice(-1) } : thread,
-        agent,
-      ),
-    [thread, agent, free],
-  );
+  const timeline = useMemo(() => buildTimeline(thread, agent), [thread, agent]);
   const pendingAction = agent.actions.some((a) => a.status === 'pending');
   const hasUserMessage = timeline.some((i) => i.kind === 'message' && i.message.role === 'user');
   // While AI cannot run, the chips would only fail again; Retry is the one action offered.
@@ -159,16 +130,6 @@ export default function JaviPanel({
     : pendingAction
       ? 'Javi wants to make a change. Approve or decline.'
       : replyAnnouncement;
-
-  // Pro dropped to Free live: the composer is gone, so focus that was inside the panel moves to Close.
-  const prevFreeRef = useRef(free);
-  useEffect(() => {
-    if (!prevFreeRef.current && free) {
-      const active = document.activeElement;
-      if (!active || active === document.body || !panelRef.current?.contains(active)) closeRef.current?.focus();
-    }
-    prevFreeRef.current = free;
-  }, [free]);
 
   const prefillId = prefill?.id ?? null;
   useEffect(() => {
@@ -241,7 +202,7 @@ export default function JaviPanel({
             <AiSourceBadge id={sourceId} ai={status?.ai} className="min-w-0" />
           </div>
         </div>
-        {!free && (
+        {PRO_UI_INCLUDED && (
           <button
             type="button"
             onClick={onNewChat}
@@ -266,7 +227,7 @@ export default function JaviPanel({
         </button>
       </div>
 
-      {!free && strip}
+      {PRO_UI_INCLUDED && strip}
 
       <div className="glass-javi-body min-h-[10rem] flex-1 space-y-3 overflow-y-auto px-4 py-4">
         <p role="status" className="sr-only">
@@ -286,11 +247,6 @@ export default function JaviPanel({
             ),
           )}
         </div>
-        {free && lastAssistant && !loading && !thread.error && !(askBlocked || adviceProRequired) && (
-          <p data-capability="javi_conversation" className="text-xs text-slate-slate300">
-            Ask follow-up questions with Pro. <BuyProLink className={HINT_LINK} />
-          </p>
-        )}
         {agent.running && agent.tools.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {agent.tools.map((t) => (
@@ -319,7 +275,7 @@ export default function JaviPanel({
             </button>
           </div>
         )}
-        {thread.error && !(free && adviceProRequired) && (
+        {thread.error && (
           <AdviceErrorRow
             error={thread.error}
             unavailable={aiUnavailable}
@@ -328,9 +284,8 @@ export default function JaviPanel({
             busy={loading}
           />
         )}
-        {free && (askBlocked || adviceProRequired) && <ProGateNotice capability="javi_conversation" />}
-        {proBlocked && <ProGateNotice capability="javi_tools" />}
-        {agent.error && !(proBlocked && agent.errorCode === PRO_REQUIRED) && (
+        {!PRO_UI_INCLUDED && askBlocked && <NotIncludedNotice capability="javi_tools" />}
+        {agent.error && (
           <div className={ERROR_ROW}>
             {agentUnavailable ? (
               <AiUnavailable message={agent.error === AGENT_UNREACHABLE_MESSAGE ? null : agent.error} code={agent.errorCode} reason={agent.errorReason} className="min-w-0 flex-1 text-xs text-slate-slate300" />
@@ -361,7 +316,7 @@ export default function JaviPanel({
         </div>
       )}
 
-      {!free && !hasUserMessage && suggestions.length > 0 && (
+      {!hasUserMessage && suggestions.length > 0 && (
         <div className="flex flex-wrap gap-2 px-4 pb-2.5">
           {suggestions.map((s) => (
             <button
@@ -381,9 +336,9 @@ export default function JaviPanel({
         </div>
       )}
 
-      {free && strip}
+      {!PRO_UI_INCLUDED && strip}
 
-      {!free && JaviComposer !== null && (
+      {PRO_UI_INCLUDED && JaviComposer !== null && (
         <Suspense fallback={null}>
           <JaviComposer inputRef={inputRef} prefill={prefill} loading={loading} focusSeq={focusSeq} onSend={onSend} />
         </Suspense>

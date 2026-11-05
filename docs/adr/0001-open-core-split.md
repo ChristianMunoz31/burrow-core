@@ -1,5 +1,7 @@
 # ADR 0001: Open-core split (AGPL core, private Pro module)
 
+> **Note (2026-11-05):** the tiering parts of this ADR (Free and Pro tiers, entitlement gates such as `requirePro` and `proAccess`, the trial and upsell UI) are superseded by [ADR 0002](0002-free-for-everyone.md). Burrow is free for everyone. The open-core split itself (the nested `pro/` module, the seams, the import allowlist and the publication rules) stays. The text below is kept as written history.
+
 - Status: Proposed, 2026-11-04
 - Scope: design only. No product code, test or config changes are made by this ADR.
 - Companion docs: [0001-extraction-inventory.md](0001-extraction-inventory.md) (what moves where, in order), [0001-work-split.md](0001-work-split.md) (two teams, frozen interfaces, QA).

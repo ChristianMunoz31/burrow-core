@@ -33,8 +33,9 @@ Every change must respect these (the PR template repeats them). Details are in [
 - [ ] Export, import, backups and privacy controls are never paywalled or weakened.
 - [ ] No em dashes in user-facing copy.
 - [ ] Targets ordinary CPU-only hardware; $0 marginal cost (no new hosted services or per-user APIs without owner approval).
-- [ ] No Pro code in core: Pro-only code lives in `pro/` ([docs/OPEN_CORE.md](docs/OPEN_CORE.md)), and core never imports `pro/`.
-- [ ] Public copy may say the Burrow core is open source under AGPL-3.0-only (https://github.com/ChristianMunoz31/burrow-core). It must never say that Pro is open source or that its source is public, and never offer Docker self-hosting ([docs/PUBLISHING_CORE.md](docs/PUBLISHING_CORE.md)).
+- [ ] No private-module code in core: code that only the private module uses lives in `pro/` ([docs/OPEN_CORE.md](docs/OPEN_CORE.md)), and core never imports `pro/`.
+- [ ] Burrow is free for everyone ([docs/adr/0002-free-for-everyone.md](docs/adr/0002-free-for-everyone.md)): no paid tier, trial, license key, Buy button or upgrade prompt, and no copy that says "Pro", "trial" or a price.
+- [ ] Public copy may say the Burrow core is open source under AGPL-3.0-only (https://github.com/ChristianMunoz31/burrow-core). It must never say that the private module is open source or that its source is public, and never offer Docker self-hosting ([docs/PUBLISHING_CORE.md](docs/PUBLISHING_CORE.md)).
 
 ## Development workflow
 
@@ -123,10 +124,10 @@ CI runs gitleaks over full history (the `hygiene:` steps of `ci.yml`), so a comm
 
 ### Licensing
 
-Burrow checks a store license key (Gumroad first, Lemon Squeezy adapter included) once, when the user clicks Activate in Settings > License, and never calls the network for licensing otherwise. The spec is [docs/LICENSING.md](docs/LICENSING.md).
+Burrow is free for everyone: there is no license key, trial, activation or paid tier, and the app contacts no store. The core is AGPL-3.0-only; the private module is proprietary and included at no cost in official builds. See [docs/LICENSING.md](docs/LICENSING.md) and [ADR 0002](docs/adr/0002-free-for-everyone.md). `npm run check:licenses` audits dependency licenses.
 
-- **Store config.** Every owner-specific store value (support contact, Gumroad product ids, versions and use limits, Lemon Squeezy ids) lives in one committed file, `config/store.json`, as placeholders. An empty value turns that store off. It is baked into the desktop sidecar and the release zip at build time and loaded by `server/license/storeConfig.js`. Run `npm run check:store-config` to print which stores are configured. Never put a seller token or API secret in it: none is needed.
-- **Testing licensing.** Tests never call a real store API. They inject a stub `fetchImpl` and use synthetic fixtures. For a manual run, start a fake store on loopback and set `BURROW_LICENSE_STORE_BASE_URL=http://127.0.0.1:<port>` (loopback http only; ignored in desktop and release builds), and `BURROW_LICENSE_STORE_TEST=1` to accept test purchases. Both are passed through by `npm run sandbox` when set, for example `$env:BURROW_LICENSE_STORE_BASE_URL = 'http://127.0.0.1:4500'; npm run sandbox`. Test purchases are otherwise accepted only in Dev builds.
+- **Support address.** The one owner-specific value left, `supportContact`, lives in `config/support.json`. The privacy page generator, the About menu and the Report content draft read it. `config/store.json` and `npm run check:store-config` no longer exist.
+- **Legacy data.** Older versions stored license, trial and clock files. Nothing reads them; their names stay listed so Erase removes them and an import skips them.
 - **Build info.** `npm run build` runs `postbuild`, which writes `dist/burrow-build-info.json` (build date from `BURROW_BUILD_DATE`, else the HEAD commit time, else the clock). Without it the app treats the build date as "now".
 
 ### Continuous integration
@@ -153,7 +154,7 @@ The owner's whole job is step 3. The one-time setup, the manual dry run and the 
 1. Merge work to `main` using conventional commits.
 2. `release-please.yml` keeps a release PR open with the next version (`package.json` plus `CHANGELOG.md`). While the version is below 1.0, `feat` bumps the minor version. Every time it creates or updates that PR it labels it `hold` and starts `ci.yml` (`mode=full`) on the release branch. The branch is `release-please--branches--main--components--burrow` and the tag is plain `vX.Y.Z` (`include-component-in-tag: false`). The PR bot never merges a release PR.
 3. Merging the release PR creates the `vX.Y.Z` tag and GitHub release in the private repo. Because tags created with `GITHUB_TOKEN` do not trigger other workflows, `release-please.yml` calls `release.yml` directly with `desktop: true` and `publish: release`.
-4. `release.yml` runs `npm ci`, `npm test` and `npm run build`, checks that the build wrote a real build date (`node scripts/license/writeBuildInfo.js --check`, which fails unless the date came from `BURROW_BUILD_DATE` or git), then attaches `burrow-<version>.zip` (the source plus the built `dist/`, runnable with `npm ci --omit=dev; npm start`) and `SHA256SUMS.txt` to the private release. The zip and its checksums stay in the private repo only. The zip is Free-only source: the job never checks out `pro/` and asserts `--expect-pro absent`. The installer jobs check out the private `burrow-pro` repo (see [docs/RELEASING.md](docs/RELEASING.md)).
+4. `release.yml` runs `npm ci`, `npm test` and `npm run build`, checks that the build wrote a real build date (`node scripts/license/writeBuildInfo.js --check`, which fails unless the date came from `BURROW_BUILD_DATE` or git), then attaches `burrow-<version>.zip` (the source plus the built `dist/`, runnable with `npm ci --omit=dev; npm start`) and `SHA256SUMS.txt` to the private release. The zip and its checksums stay in the private repo only. The zip is core-only source: the job never checks out `pro/` and asserts `--expect-pro absent`. The installer jobs check out the private `burrow-pro` repo (see [docs/RELEASING.md](docs/RELEASING.md)).
 5. In parallel, `desktop-windows.yml` builds the unsigned Windows installers natively (x64 on `windows-latest`, ARM64 on `windows-11-arm`). Each build smoke-tests the sidecar (`scripts/release/smokeSidecar.js`, blocking) and the installer (`scripts/release/smokeInstaller.js`, non-blocking), then renames the installer to `Burrow-Setup-x64.exe` or `Burrow-Setup-arm64.exe`.
 6. The installers and per-arch checksums are also attached to the private release. Then `publish-public` builds `SHA256SUMS.txt` and runs `scripts/release/publishPublic.js`, which publishes a release with the same tag in the PUBLIC repo `ChristianMunoz31/burrow-releases` (the two installers and `SHA256SUMS.txt` only, with plain-language notes from `CHANGELOG.md`) and marks it latest. It authenticates with the `RELEASES_TOKEN` secret and fails early with instructions when it is empty. So `https://github.com/ChristianMunoz31/burrow-releases/releases/latest/download/Burrow-Setup-x64.exe` (and `...-arm64.exe`) always resolve to the newest release.
 
@@ -194,7 +195,7 @@ npm run desktop:build:dev # Burrow Dev build (see "Dev channel" below)
 
 Burrow Dev is a second, unsigned build of the desktop app for testing. It installs next to Burrow and shares nothing with it: its own app identity, install folder, data, logs, icon and update source. Dev builds are internal; they are never attached to a `v*` release and never offered to users. The stable path is the default everywhere: nothing becomes a Dev build unless `BURROW_CHANNEL=dev` is set at build time.
 
-**Developer tools.** The developer tier switcher (Settings > Developer, `/api/dev/license`, `BURROW_DEV_TIER`) lives in the top-level `devtools/` folder, not in the core. It is in `npm run dev`, `npm run desktop:dev -- --devtools`, `npm run build:devtools; npm start` and Burrow Dev builds, and never in a stable build, the Microsoft Store build, Docker or the release zip (`docs/LICENSING.md` 14.1). Plain `desktop:dev` builds the normal UI and rebuilds dist/ by itself when it is missing, was built in the other mode, from another commit, or the worktree has changes (a stamp in dist/ that the sidecar copy and the Store layout skip); the build identity line at the bottom of Settings says `stable · developer tools` when the tools UI is in. `desktop:dev -- --devtools` leaves a dist with the developer tools: run `npm run build` before any stable `desktop:sidecar`, `release:store --reuse-web` or `release:local`, which refuse a dev-tools dist.
+**Developer tools.** The developer tools seam (Settings > Developer, `GET /api/dev/status`) lives in the top-level `devtools/` folder, not in the core. It is a minimal placeholder: the Settings > Developer card says developer tools are on, and the route answers `{ devTools: true }`. It is in `npm run dev`, `npm run desktop:dev -- --devtools`, `npm run build:devtools; npm start` and Burrow Dev builds, and never in a stable build, the Microsoft Store build, Docker or the release zip. The tier switcher it used to hold is gone with the tiers (ADR 0002). Plain `desktop:dev` builds the normal UI and rebuilds dist/ by itself when it is missing, was built in the other mode, from another commit, or the worktree has changes (a stamp in dist/ that the sidecar copy and the Store layout skip); the build identity line at the bottom of Settings says `stable · developer tools` when the tools UI is in. `desktop:dev -- --devtools` leaves a dist with the developer tools: run `npm run build` before any stable `desktop:sidecar`, `release:store --reuse-web` or `release:local`, which refuse a dev-tools dist.
 
 **Commands.**
 
@@ -220,7 +221,6 @@ npm run desktop:icons                     # regenerate the stable icons and the 
 | Single-instance lock | per identifier | per identifier, so both run at once |
 | Icon | `src-tauri/icons/*` | `src-tauri/icons/dev/*` (same artwork plus an amber DEV badge) |
 | Update source | latest release of the public `burrow-releases` repo (same `vX.Y.Z` tag as the source release); in-app install: stable only | newest dev pre-release (tag `dev-YYYYMMDD-<sha7>`, title `Burrow Dev <display version>`) |
-| Store test purchases (Gumroad `test: true`, Lemon Squeezy `test_mode`) | refused | accepted |
 
 **Versions.** Dev builds carry two version strings for the same build, because the display form is not valid for every installer field.
 
@@ -233,27 +233,21 @@ npm run desktop:icons                     # regenerate the stable icons and the 
 | Installer | `Burrow_X.Y.Z_<arch>-setup.exe` | `Burrow-Dev_0.2.0-dev.20261005.abc1234_arm64-setup.exe` |
 
 - The next version comes from `.release-please-manifest.json` and `bump-minor-pre-major`: while the major is 0 it is `0.(minor+1).0` (so `0.1.0` becomes `0.2.0`), otherwise `major.(minor+1).0`.
-- The display version is what the user sees: the server, the About dialog, the Dev badge, backups metadata, the license status and the update check all use it. It contains the commit's 7-character sha.
+- The display version is what the user sees: the server, the About dialog, the Dev badge, backups metadata and the update check all use it. It contains the commit's 7-character sha.
 - The bundle version only goes into the generated Tauri overlay. It is valid semver, drops the sha (an all-digit sha with a leading zero is not valid semver) and ends in a build number: whole days since 2024-01-01, between 1 and 65535. That gives Windows a numeric, increasing file version, shows `0.2.0-dev.20261005+1008` in Apps & Features, and lets the installer's downgrade check order Dev builds by date. macOS gets the same number as `bundleVersion`.
 - The build date follows `resolveBuildDate()` (`BURROW_BUILD_DATE`, else the HEAD commit time, else the clock). Dev builds need a git checkout.
 - `--collect` renames installers (bundle version to display version, `Burrow Dev` to `Burrow-Dev`) and fails if a name lacks the display version or the word `dev`.
 
-**Guards (stable can never become Dev, or accept test purchases).**
+**Guards (stable can never become Dev).**
 
 - The server learns its channel from the esbuild define `__BURROW_CHANNEL__` (always set in a bundle, `"stable"` or `"dev"`). The shell environment cannot switch a bundle. `BURROW_CHANNEL=dev` only affects a source checkout (`npm start`); the Rust shell reads its channel from the app identifier.
 - Every bundle starts with the marker `/*! BURROW_CHANNEL=<channel> */`, and `dist/burrow-build-info.json` records `channel`. `node scripts/checks/channelMarker.js --expect <stable|dev> --bundle <file> --dist-dir <dir>` verifies both. `release.yml` sets `BURROW_CHANNEL: stable`, runs the check with `--expect stable`, fails if `BURROW_DISPLAY_VERSION` is set, and fails if any collected installer name matches `dev`.
 - A `dev-*` tag never starts a release: the release tag pattern is `v*`.
 - **Cross-checks before anything touches the data folder.** In the desktop app the shell always passes `BURROW_SHELL_CHANNEL=stable|dev` to the sidecar. The server exits with code 1 and a plain message when that is not its own channel (a bundled server also refuses when it is missing), and its `BURROW_READY` line carries `channel`, which the shell checks against its own (a mismatch stops the server and shows the error page). A Dev server (and a Dev shell, before it starts the sidecar) also refuses a data folder that is, contains or lies inside the stable default data folder or the `BURROW_STABLE_DATA_DIR` copy source, compared by real location (links resolved, case-folded on Windows and macOS) with no read of the folder. `desktop:build` and `desktop:build:dev` accept no `--config` or `-c` in their passthrough, and right before `tauri build` they scan the bundle and the packaged sidecar executable for the channel marker (`channelMarker.js --binary <file>`), so a stale sidecar of the other channel cannot be packaged.
-- **Not a trust boundary.** These guards stop mistakes (a wrong `BURROW_DATA_DIR`, an old sidecar, a mixed-up installer), not a determined user. The release zip and Docker image run the server unbundled, so they read `BURROW_CHANNEL` from the environment like a source checkout; `__BURROW_RELEASE_BUILD__` is defined only in a bundled sidecar, so an unbundled copy is a source checkout as far as licensing goes. Only the esbuild define of a bundled sidecar is fixed at build time.
+- **Not a trust boundary.** These guards stop mistakes (a wrong `BURROW_DATA_DIR`, an old sidecar, a mixed-up installer), not a determined user. The release zip and Docker image run the server unbundled, so they read `BURROW_CHANNEL` from the environment like a source checkout; `__BURROW_RELEASE_BUILD__` is defined only in a bundled sidecar, so an unbundled copy is a source checkout as far as the developer tools are concerned. Only the esbuild define of a bundled sidecar is fixed at build time.
 - **Separate sidecar binary.** Burrow Dev packages its server as `burrow-dev-server-<triple>` (Burrow keeps `burrow-server-<triple>`), so both can install into the same folder, as Linux packages do, without sharing a file. `buildSidecar.js --channel dev` writes that name and the shell picks it from its channel.
 
-**Channel detection (for reuse).** To ask "is this Burrow Dev?" in server code, call `isDevChannel()` (or `getChannel()`) from `server/channel.js`; do not compare `BURROW_CHANNEL` or `'dev'` yourself. The bundled `__BURROW_CHANNEL__` define wins, and the env var is read only by an unbundled source checkout, so it is not a trust boundary. The matching signals are the `channel` field in `dist/burrow-build-info.json` (build time) and `channel` in `GET /api/app-info` (client side). Dev-only license behavior hangs off `allowStoreTestPurchases` in `server/license/channelSeam.js`, which defaults to `isDevChannel()`.
-
-**Test-purchase policy.**
-
-- Dev builds accept store TEST purchases (Gumroad `test: true`, Lemon Squeezy `test_mode`), so you can test Pro in the installed app with a test purchase from your own store account. Dev builds accept no license keys of their own.
-- Stable builds refuse test purchases, whatever the environment says (the bundled channel define wins).
-- The license clock guard and the trial are stored per data folder, so Burrow and Burrow Dev have separate ones.
+**Channel detection (for reuse).** To ask "is this Burrow Dev?" in server code, call `isDevChannel()` (or `getChannel()`) from `server/channel.js`; do not compare `BURROW_CHANNEL` or `'dev'` yourself. The bundled `__BURROW_CHANNEL__` define wins, and the env var is read only by an unbundled source checkout, so it is not a trust boundary. The matching signals are the `channel` field in `dist/burrow-build-info.json` (build time) and `channel` in `GET /api/app-info` (client side). Burrow is free for everyone, so there is no license or purchase behavior that differs between Burrow and Burrow Dev.
 
 **Copy data from Burrow.** Settings > Data & storage in Burrow Dev has "Copy my data from Burrow". It is one-way: Burrow Dev reads Burrow's database files with shared read-only file handles (never opening them with SQLite), copies them into a private folder inside the Dev data folder, and checks that nothing changed during the copy (it retries, then answers busy). Burrow's folder is never written to. The copy then goes through the normal restore flow, so Burrow Dev first makes a safety backup of its own data and keeps its own saved keys. Saved keys from Burrow are never copied. The routes `GET` and `POST /api/backups/stable-copy` exist only in the dev channel (a stable server answers `404 not_found`). For tests, `BURROW_STABLE_DATA_DIR` (server) or `BURROW_DESKTOP_STABLE_DATA_DIR` (Dev shell only) points the copy source at a throwaway folder.
 
@@ -313,7 +307,7 @@ Run the **Flaky test hunt** workflow (Actions tab, manual). Inputs: number of ru
 
 ### Docker (internal)
 
-Docker is an internal development and test setup, not offered for self-hosting and not the consumer path (the desktop app is). An image built while `pro/` exists contains the Pro server source, so it stays internal: never push it to any registry.
+Docker is an internal development and test setup, not offered for self-hosting and not the consumer path (the desktop app is). An image built while `pro/` exists contains the private module's server source, so it stays internal: never push it to any registry.
 
 ```powershell
 $env:APP_PASSWORD = '<a password>'
@@ -334,15 +328,15 @@ The Ollama container publishes no host ports. Because it is not loopback from Bu
 
 ### AI eval
 
-`node pro/scripts/evalAi.js` checks Javi against a real local Ollama (there is no `npm run eval:ai` any more: the script lives in the Pro module, so it needs `pro/`). It is not part of `npm test` and never runs in CI. `npm run eval:javi` stays in core for the Free paths. See [docs/EVALS.md](docs/EVALS.md).
+`node pro/scripts/evalAi.js` checks Javi against a real local Ollama (there is no `npm run eval:ai` any more: the script lives in the Pro module, so it needs `pro/`). It is not part of `npm test` and never runs in CI. `npm run eval:javi` stays in core for the core paths. See [docs/EVALS.md](docs/EVALS.md).
 
 ### The Pro module (`pro/`, owner workflow)
 
-Pro features live in `pro/`, a separate private git repo (remote `burrow-pro`) that sits inside the core checkout and is ignored by core. The boundary, the allowlist and the extension points are in [docs/OPEN_CORE.md](docs/OPEN_CORE.md). Contributors without access to `pro/` work in Free mode and need nothing else.
+The private module lives in `pro/`, a separate private git repo (remote `burrow-pro`) that sits inside the core checkout and is ignored by core. It is included at no cost in official builds. The boundary, the allowlist and the extension points are in [docs/OPEN_CORE.md](docs/OPEN_CORE.md). Contributors without access to `pro/` work in core-only mode and need nothing else.
 
 - Clone it into the checkout: `git clone <burrow-pro remote URL> pro`, then `npm run check:pro-present` (exit 0 when it is complete). Commit its changes with `git -C pro ...` to the `burrow-pro` remote. Never commit anything under `pro/` to core (the pre-commit hook refuses it).
 - New commands: `npm run check:pro-present`, and `npm run export:core -- --out <dir>` (owner only, see [docs/PUBLISHING_CORE.md](docs/PUBLISHING_CORE.md)). `npm test` runs core plus Pro suites when `pro/` exists; `npx vitest run pro/ui pro/server` runs only the Pro suites; `npm run test:e2e -- --project=pro-flows` runs the Pro end to end flows.
-- Put code in core if Free uses it and in `pro/` if only Pro uses it. Pro may import core only through the allowlist in `scripts/build/proBoundary.js`, and core never imports `pro/` (the boundary test `server/__tests__/proBoundary.test.js` checks both).
+- Put code in core if the core uses it and in `pro/` if only the module uses it. The module may import core only through the allowlist in `scripts/build/proBoundary.js`, and core never imports `pro/` (the boundary test `server/__tests__/proBoundary.test.js` checks both).
 - **Test in both modes** before you ask for review: run `npm test` with `pro/` present, then move `pro/` OUTSIDE the repo, run the core checks, and move it back. Never rename `pro/` inside the repo.
 
   ```powershell
@@ -357,4 +351,4 @@ Pro features live in `pro/`, a separate private git repo (remote `burrow-pro`) t
 
 ### Contributions and the CLA
 
-The Burrow core is published at [github.com/ChristianMunoz31/burrow-core](https://github.com/ChristianMunoz31/burrow-core) under AGPL-3.0-only. Contributions to it need a signed Contributor License Agreement (the text is in [docs/CLA.md](docs/CLA.md), a draft that needs the owner's legal review first). The CLA check is planned: once it is turned on, every pull request on the public repo will ask you to reply with a signature sentence once. It is not turned on yet. Pro features are a private module and do not take outside contributions.
+The Burrow core is published at [github.com/ChristianMunoz31/burrow-core](https://github.com/ChristianMunoz31/burrow-core) under AGPL-3.0-only. Contributions to it need a signed Contributor License Agreement (the text is in [docs/CLA.md](docs/CLA.md), a draft that needs the owner's legal review first). The CLA check is planned: once it is turned on, every pull request on the public repo will ask you to reply with a signature sentence once. It is not turned on yet. The private module does not take outside contributions.

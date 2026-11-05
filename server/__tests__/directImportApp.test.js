@@ -3,7 +3,6 @@
 // shows or runs the import. (directImportRoutes.test.js covers the routes with the offer on.)
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
-import { resetLicenseForTests } from '../license/index.js';
 import { cleanupBackupEnv } from './helpers/backupEnv.js';
 import { SAME_ORIGIN, freshDb } from './helpers/eraseEnv.js';
 
@@ -28,7 +27,6 @@ beforeEach(() => {
   freshDb();
 });
 afterEach(() => {
-  resetLicenseForTests();
   cleanupBackupEnv();
 });
 

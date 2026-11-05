@@ -18,14 +18,16 @@ import {
 import { LOCAL_ONLY_APP_STATE_KEYS, REDACTED } from '../dataBrowser/redact.js';
 import { importFolderTable, isFolderArchiveTable, newFolderImportContext } from '../folders/importRules.js';
 import { defaultTodoStatus } from '../todoStatus.js';
+import { ACTIVATION_STATE_KEY, CLOCK_STATE_KEY, TRIAL_NOTICES_STATE_KEY, TRIAL_STATE_KEY } from '../license/constants.js';
 
 export const IMPORT_MAX_ENTRY_BYTES = 64 * 1024 * 1024;
 export const IMPORT_MAX_TOTAL_BYTES = 256 * 1024 * 1024; // CLI default
 export const IMPORT_API_MAX_TOTAL_BYTES = 64 * 1024 * 1024; // HTTP path: the archive is inflated in memory
 // app_state keys an archive may never set: restoring them could silently enable outbound features
-// (network.optIn), roll back the license clock or trial, replace the license activation, or switch automatic backups off or on (backup.auto).
+// (network.optIn), bring back the legacy license records older versions kept (clock, trial, activation), or switch automatic
+// backups off or on (backup.auto).
 // 'dev.licenseOverride' is reserved by devtools/ (a defensive literal, no override code lives here).
-export const PROTECTED_APP_STATE_KEYS = new Set(['network.optIn', 'license.clock', 'license.trial', 'license.trialNotices', 'license.activation', 'backup.auto', 'dev.licenseOverride']);
+export const PROTECTED_APP_STATE_KEYS = new Set(['network.optIn', CLOCK_STATE_KEY, TRIAL_STATE_KEY, TRIAL_NOTICES_STATE_KEY, ACTIVATION_STATE_KEY, 'backup.auto', 'dev.licenseOverride']);
 // Cloud AI consent, categories and hint (`ai.cloudConsent`, `ai.cloudCategories`, `ai.cloudHint`)
 // are written only by the consent routes: an archive or a generic state write that set them would
 // turn cloud AI on, or widen what it sees, without the consent flow.

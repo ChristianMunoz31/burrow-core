@@ -8,7 +8,7 @@ import { NAV_GROUPS } from '../navItems';
 import { ModeProvider } from '../../../contexts/ModeContext';
 
 // Minimal stub: ModeProvider reads `mode` from useSyncedSetting (database-backed).
-const settings = vi.hoisted(() => ({ mode: 'all', founder: false, name: null, navHideSubcategories: false }));
+const settings = vi.hoisted(() => ({ mode: 'all', name: null, navHideSubcategories: false }));
 vi.mock('../../../hooks/useSyncedSetting', () => ({
   useSyncedSetting: (key, fallback) => {
     if (key === 'nav:hideSubcategories') {
@@ -16,10 +16,6 @@ vi.mock('../../../hooks/useSyncedSetting', () => ({
     }
     return [settings.mode ?? fallback, vi.fn(), { isFetched: true, isLoading: false }];
   },
-}));
-
-vi.mock('../../../hooks/useLicense', () => ({
-  useLicenseFlags: () => ({ known: true, founderBackground: settings.founder, pro: false, trial: null }),
 }));
 
 vi.mock('../../../hooks/useProfile', () => ({
@@ -95,7 +91,6 @@ const listOrder = (dialog) =>
 beforeEach(() => {
   localStorage.clear();
   settings.mode = 'all';
-  settings.founder = false;
   settings.name = null;
   settings.navHideSubcategories = false;
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('null', { status: 200 }));
@@ -107,18 +102,12 @@ afterEach(() => {
   document.body.style.overflow = '';
 });
 
-describe('BurgerMenu founder badge', () => {
-  it('shows the Founding member badge in the footer only when the founder perk is active', async () => {
-    settings.founder = true;
+describe('BurgerMenu footer', () => {
+  it('shows only the privacy line, with no membership badge', async () => {
     const user = setup();
     const dialog = await openMenu(user);
-    expect(within(dialog).getByText('Founding member')).toBeInTheDocument();
-  });
-
-  it('hides the badge without the founder perk', async () => {
-    const user = setup();
-    const dialog = await openMenu(user);
-    expect(within(dialog).queryByText('Founding member')).not.toBeInTheDocument();
+    expect(within(dialog).getByText('Private, on this device')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/founding|member/i)).not.toBeInTheDocument();
   });
 });
 

@@ -217,9 +217,9 @@ describe('resolveChannelBuild (buildSidecar flags)', () => {
   }, 60_000);
 });
 
-// Bundles the real channelSeam module with each define, loads the result and asks it about test
-// purchases. This is the guarantee the release relies on: a stable bundle cannot be switched to dev.
-describe('store test purchases in a bundled sidecar', () => {
+// Bundles the real channelSeam module with each define, loads the result and asks it about the developer tools.
+// This is the guarantee the release relies on: a stable bundle cannot be switched to dev.
+describe('developer tools in a bundled sidecar', () => {
   const require = createRequire(import.meta.url);
 
   async function bundleSeam(name, define) {
@@ -238,20 +238,19 @@ describe('store test purchases in a bundled sidecar', () => {
     return { text: fs.readFileSync(file, 'utf8'), seam: require(file) };
   }
 
-  it('a stable bundle refuses test purchases, whatever the environment says', async () => {
+  it('a stable bundle has no store test-purchase hooks and says it is not a release-only dev build', async () => {
     const { text, seam } = await bundleSeam('stable', bundleDefine('0.1.0'));
     expect(checkBundleText(text, 'stable')).toEqual([]);
-    const env = { BURROW_LICENSE_STORE_TEST: '1', BURROW_CHANNEL: 'dev' };
-    expect(seam.allowStoreTestPurchases(env)).toBe(false);
-    expect(seam.allowStoreTestPurchases({ ...env, BURROW_DESKTOP: '1' })).toBe(false);
-    expect(seam.allowStoreTestPurchases({})).toBe(false);
+    for (const removed of ['allowStoreTestPurchases', 'storeBaseUrl', 'rejectsTestRecords', 'STORE_ORIGINS']) {
+      expect(seam, removed).not.toHaveProperty(removed);
+    }
+    expect(text).not.toContain('BURROW_LICENSE_STORE');
   });
 
-  it('a dev bundle accepts test purchases, also in desktop mode and without the env switch', async () => {
+  it('a dev bundle passes the dev channel check too', async () => {
     const { text, seam } = await bundleSeam('dev', bundleDefine(DISPLAY, { channel: 'dev' }));
     expect(checkBundleText(text, 'dev')).toEqual([]);
-    expect(seam.allowStoreTestPurchases({})).toBe(true);
-    expect(seam.allowStoreTestPurchases({ BURROW_DESKTOP: '1' })).toBe(true);
+    expect(typeof seam.devToolsCompiledIn).toBe('function');
   });
 });
 

@@ -4,7 +4,7 @@
 // this file; Pro UI tests vi.mock it with the Pro module (docs/OPEN_CORE.md).
 import { noAgentToolLabel, useNoInsightsExplain, useNoJaviAgent } from './proDefaults';
 
-/** False in the core build: the Pro UI is not compiled in, so hosts show Free UI (isFreeUi). */
+/** False in the core build: the private module's UI is not compiled in, so hosts show the not-included notice. */
 export const PRO_UI_INCLUDED = false;
 export const useJaviAgent = useNoJaviAgent;
 export const agentToolLabel = noAgentToolLabel;

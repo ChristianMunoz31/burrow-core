@@ -5,13 +5,9 @@ import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../../contexts/ToastContext';
-import { FREE_STATE, resetEntitlementsState, setEntitlementsState } from '../../../test-utils/entitlements';
 import { __resetPullStoreForTests } from '../../../hooks/ollamaPullStore';
 import { LIMITS, STATS, apiError, folderView, jobView } from './folderFixtures';
 
-vi.mock('../../../hooks/useEntitlements', async () =>
-  (await import('../../../test-utils/entitlements.js')).entitlementsModule(),
-);
 vi.mock('../../../services/foldersService', () => ({
   foldersService: {
     list: vi.fn(),
@@ -29,17 +25,6 @@ vi.mock('../../../services/foldersService', () => ({
 }));
 vi.mock('../../../services/aiSettingsService', () => ({
   aiSettingsService: { pull: vi.fn(), setup: vi.fn(), get: vi.fn() },
-}));
-vi.mock('../../../services/licenseService', () => ({
-  licenseService: {
-    get: vi.fn(async () => ({
-      state: 'free',
-      pro: false,
-      trial: { state: 'ended' },
-      license: null,
-      purchaseUrl: null,
-    })),
-  },
 }));
 
 import FoldersPage from '../FoldersPage';
@@ -76,7 +61,6 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  resetEntitlementsState();
   __resetPullStoreForTests();
 });
 
@@ -509,7 +493,7 @@ describe('FoldersPage actions', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('does not turn on the daily re-scan in a build without the Pro module, even with Pro entitlements', async () => {
+  it('does not turn on the daily re-scan in a build without the private module and says so', async () => {
     const user = userEvent.setup();
     foldersService.list.mockResolvedValue(listing([folderView()]));
     renderPage();
@@ -523,8 +507,7 @@ describe('FoldersPage actions', () => {
 describe('FoldersPage Report notice (needs Javi)', () => {
   const unavailable = { status: 'ai_unavailable', text: null, model: null, at: null };
 
-  it('shows the Pro notice, not the Javi notice, on Free', async () => {
-    setEntitlementsState(FREE_STATE);
+  it('shows the not-included notice, not the Javi notice, without the module', async () => {
     const user = userEvent.setup();
     foldersService.list.mockResolvedValue(listing([folderView({ summary: unavailable })]));
     renderPage();
@@ -534,9 +517,8 @@ describe('FoldersPage Report notice (needs Javi)', () => {
   });
 });
 
-describe('FoldersPage Pro panels', () => {
-  it('shows the upgrade notice instead of the Pro panels when Pro is off', async () => {
-    setEntitlementsState(FREE_STATE);
+describe('FoldersPage module panels', () => {
+  it('shows the not-included notice instead of the module panels in a core-only build', async () => {
     const user = userEvent.setup();
     foldersService.list.mockResolvedValue(listing([folderView()]));
     renderPage();
@@ -555,8 +537,7 @@ describe('FoldersPage Pro panels', () => {
     await waitFor(() => expect(capability('folder_auto_rescan')).not.toBeNull());
   });
 
-  it('keeps turning the daily re-scan off free', async () => {
-    setEntitlementsState(FREE_STATE);
+  it('keeps turning the daily re-scan off', async () => {
     const user = userEvent.setup();
     foldersService.list.mockResolvedValue(listing([folderView({ autoRescan: true })]));
     foldersService.update.mockResolvedValue({ folder: folderView({ autoRescan: false }) });
@@ -566,9 +547,8 @@ describe('FoldersPage Pro panels', () => {
     expect(foldersService.update).toHaveBeenCalledWith('f1', { autoRescan: false });
   });
 
-  it('lets a free user read an existing report but not write a new one', async () => {
+  it('lets anyone read an existing report, while writing a new one needs the module', async () => {
     const user = userEvent.setup();
-    setEntitlementsState(FREE_STATE);
     const report = { text: 'Themes\nPlans and notes.', model: 'm', at: '2026-10-08T12:00:00Z' };
     foldersService.list.mockResolvedValue(listing([folderView({ report })]));
     renderPage();
@@ -701,7 +681,6 @@ describe('FoldersPage More menu', () => {
   });
 
   it('says when the daily re-scan is turned off', async () => {
-    setEntitlementsState(FREE_STATE);
     const user = userEvent.setup();
     foldersService.list.mockResolvedValue(listing([folderView({ autoRescan: true })]));
     foldersService.update.mockResolvedValue({ folder: folderView({ autoRescan: false }) });

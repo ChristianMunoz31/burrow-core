@@ -45,7 +45,6 @@ vi.mock('../../hooks/useSyncedSetting', async () => {
 });
 vi.mock('../../hooks/useBriefing', async (orig) => ({ ...(await orig()), useBriefing: () => ({ briefing: h.briefing, alerts: [] }) }));
 vi.mock('../../hooks/useWeather', () => ({ useCachedWeatherReader: () => () => h.weather }));
-vi.mock('../../hooks/useEntitlements', async () => (await import('../../test-utils/entitlements.js')).entitlementsModule());
 vi.mock('../../contexts/PageContextContext', () => ({
   usePageContext: (_page, build) => {
     h.context = build();

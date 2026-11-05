@@ -1,6 +1,6 @@
 // The docked Javi bar and its message window (src/components/javi/). The bar is hidden (display: none) while the
-// window is open, so `bar` only resolves while Javi is collapsed. The composer, `ask` and the confirm card are Pro
-// only: pro/e2e/pages/javiPro.js.
+// window is open, so `bar` only resolves while Javi is collapsed. The composer, `ask` and the confirm card come from the private module
+// and are driven from pro/e2e/pages/javiPro.js.
 import { expect } from '../support/fixtures.js';
 import { PLAIN_REPLY } from '../../scripts/lib/fakeOllamaServer.js';
 import { JAVI_PAGE_PATHS } from '../../server/javi/pages.js';

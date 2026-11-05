@@ -563,7 +563,7 @@
     --mesh-graphite-light-2: rgba(209, 213, 219, 0.30);
     --mesh-graphite-light-3: rgba(148, 163, 184, 0.24);
 
-    /* Founder (Founding licenses only): brand purple #8b5cf6, deep #5b21b6, gold #fde68a.
+    /* Purple and gold (id founder): brand purple #8b5cf6, deep #5b21b6, gold #fde68a.
        Much bolder than the other presets on purpose: the glass tokens are overridden for
        Founder below (denser, purple-tinted), so the text contrast envelope still holds. */
     --mesh-founder-dark-1: rgba(150, 95, 235, 0.32);

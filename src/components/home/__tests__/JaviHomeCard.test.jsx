@@ -1,7 +1,5 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../../../hooks/useEntitlements', async () => (await import('../../../test-utils/entitlements.js')).entitlementsModule());
-vi.mock('../../../hooks/useLicense', () => ({ useLicense: () => ({ status: null }) }));
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -9,11 +7,10 @@ import { MemoryRouter } from 'react-router-dom';
 import JaviHomeCard from '../JaviHomeCard';
 import { PageContextProvider, usePageContext } from '../../../contexts/PageContextContext';
 import { useCachedWeatherReader } from '../../../hooks/useWeather';
-import { FREE_STATE, resetEntitlementsState, setEntitlementsState } from '../../../test-utils/entitlements.js';
 import { jsonResponse, sseEvent, sseResponse } from '../../../test-utils/sseResponse';
 
 // Synthetic data only.
-const h = vi.hoisted(() => ({ briefing: null, weatherOn: false, advice: null, calls: [], forecast: null, weatherStatus: 200, profile: null }));
+const h = vi.hoisted(() => ({ briefing: null, weatherOn: false, advice: null, calls: [], status: null, forecast: null, weatherStatus: 200, profile: null }));
 
 const FORECAST = {
   latitude: 1.23,
@@ -31,6 +28,7 @@ function route(url, init) {
   const path = String(url);
   h.calls.push(path);
   if (path === '/api/jarvis/briefing') return Promise.resolve(jsonResponse(h.briefing ?? { empty: true }));
+  if (path === '/api/jarvis/status') return Promise.resolve(jsonResponse(h.status ?? { available: true, provider: 'ollama', ai: { kind: 'local', host: null } }));
   if (path === '/api/settings/network') {
     return Promise.resolve(
       jsonResponse({ features: [{ id: 'weather', enabled: h.weatherOn, label: 'Weather', description: '', hosts: [] }] }),
@@ -72,6 +70,7 @@ let geo;
 beforeEach(() => {
   h.briefing = null;
   h.weatherOn = false;
+  h.status = null;
   h.forecast = null;
   h.weatherStatus = 200;
   h.profile = null;
@@ -85,17 +84,15 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  resetEntitlementsState();
 });
 
 describe('JaviHomeCard', () => {
-  it('Free automatically provides overall Home insight without prompting, then shows it with its source, Report and Refresh', async () => {
-    setEntitlementsState(FREE_STATE);
-    h.briefing = { generatedAt: new Date().toISOString(), digest: 'Trial briefing.', alerts: [], ai: null, withheld: [] };
+  it('automatically provides overall Home insight without prompting, then shows it with its source, Report and Refresh', async () => {
+    h.briefing = { generatedAt: new Date().toISOString(), digest: 'Stored briefing.', alerts: [], ai: null, withheld: [] };
     const user = userEvent.setup();
     mount();
     expect(await screen.findByText('Two todos are due today.')).toBeInTheDocument();
-    expect(screen.queryByText('Trial briefing.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Stored briefing.')).not.toBeInTheDocument();
     expect(adviceCalls()).toEqual(['/api/jarvis/advice']);
     const body = JSON.parse(h.advice.mock.calls[0][1].body);
     expect(body).toMatchObject({ page: 'home', messages: [] });
@@ -113,7 +110,6 @@ describe('JaviHomeCard', () => {
   });
 
   it('shows the cut-short notice that came with the insight', async () => {
-    setEntitlementsState(FREE_STATE);
     h.advice.mockImplementation(() =>
       Promise.resolve(sseResponse([sseEvent('delta', { content: 'Partial' }), sseEvent('done', { content: 'Partial', notice: 'Javi stopped early.' })])),
     );
@@ -123,7 +119,6 @@ describe('JaviHomeCard', () => {
   });
 
   it('shows the AI setup copy when Javi cannot run, and Retry', async () => {
-    setEntitlementsState(FREE_STATE);
     h.advice.mockImplementation(() =>
       Promise.resolve(jsonResponse({ error: 'ai_not_configured', reason: 'no_model', message: 'Javi needs a model.' }, 503)),
     );
@@ -133,8 +128,51 @@ describe('JaviHomeCard', () => {
     expect(adviceCalls()).toEqual(['/api/jarvis/advice']);
   });
 
+  it.each([
+    ['ai_not_configured', 'no_model', 'Javi needs a model.'],
+    ['ollama_unavailable', 'ollama_unavailable', "Burrow can't reach Ollama."],
+  ])('makes no advice request while AI is unavailable (%s) and shows the AI setup copy', async (code, reason, message) => {
+    h.status = { available: false, provider: 'ollama', ai: { kind: 'local', host: null }, code, reason, message };
+    mount();
+    expect(await screen.findByText('Javi needs Ollama')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Settings > AI/ })).toHaveAttribute('href', '/settings#ai');
+    expect(screen.getByRole('button', { name: 'Refresh insight' })).toBeDisabled();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(adviceCalls()).toEqual([]);
+  });
+
+  it('waits for the AI status before asking for the insight', async () => {
+    let release;
+    const gate = new Promise((r) => {
+      release = r;
+    });
+    const base = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url, init) => {
+        if (String(url) === '/api/jarvis/status') await gate;
+        return base(url, init);
+      }),
+    );
+    mount();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(adviceCalls()).toEqual([]);
+    release();
+    expect(await screen.findByText('Two todos are due today.')).toBeInTheDocument();
+    expect(adviceCalls()).toEqual(['/api/jarvis/advice']);
+  });
+
+  it('asks for the insight when the AI status cannot be read', async () => {
+    const base = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url, init) => (String(url) === '/api/jarvis/status' ? Promise.resolve(jsonResponse({}, 500)) : base(url, init))),
+    );
+    mount();
+    expect(await screen.findByText('Two todos are due today.')).toBeInTheDocument();
+  });
+
   it('with Weather off: no weather request, no location prompt, only a quiet Show weather link', async () => {
-    setEntitlementsState(FREE_STATE);
     mount();
     const link = await screen.findByRole('link', { name: 'Show weather' });
     expect(link).toHaveAttribute('href', '/settings#network');
@@ -145,7 +183,6 @@ describe('JaviHomeCard', () => {
   });
 
   it('with Weather on integrates weather into Javi generated insight', async () => {
-    setEntitlementsState(FREE_STATE);
     h.weatherOn = true;
     h.advice.mockImplementation((_path, init) => {
       const body = JSON.parse(init.body);
@@ -189,7 +226,6 @@ describe('JaviHomeCard', () => {
   });
 
   it('with no saved location: never asks the browser, one muted line links to Settings', async () => {
-    setEntitlementsState(FREE_STATE);
     h.weatherOn = true;
     h.weatherStatus = 503;
     h.forecast = { error: 'weather_location_missing', code: 'weather_location_missing', message: 'x' };
@@ -202,7 +238,6 @@ describe('JaviHomeCard', () => {
   });
 
   it('another 503 (for example a restore in progress) is the generic line, not the Settings link', async () => {
-    setEntitlementsState(FREE_STATE);
     h.weatherOn = true;
     h.weatherStatus = 503;
     h.forecast = { error: 'db_restoring', code: 'db_restoring', message: 'x' };
@@ -212,7 +247,6 @@ describe('JaviHomeCard', () => {
   });
 
   it('a weather error is a muted status line', async () => {
-    setEntitlementsState(FREE_STATE);
     h.weatherOn = true;
     h.weatherStatus = 500;
     h.forecast = { error: 'upstream_failed', message: 'x' };

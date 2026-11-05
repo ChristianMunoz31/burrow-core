@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-/** React Query key of the cached daily briefing; the Pro refresh mutation writes the new briefing under it. */
+/** React Query key of the cached daily briefing; the refresh mutation of the private module writes the new briefing under it. */
 export const BRIEFING_QUERY_KEY = ['jarvis-briefing'];
 
 /** True when the briefing was written today (local date). Home and Javi use it. */
@@ -8,7 +8,7 @@ export const isBriefingToday = (b) =>
   Boolean(b?.generatedAt) && new Date(b.generatedAt).toDateString() === new Date().toDateString();
 
 // Reads the cached daily briefing (GET /api/jarvis/briefing). Shared by the Javi card on Home, Home and the TopBar
-// notification bell. Writing a new briefing is Pro (the Pro UI hook useBriefingRefresh).
+// notification bell. Writing a new briefing comes from the private module (the UI hook useBriefingRefresh).
 export function useBriefing() {
   const query = useQuery({
     queryKey: BRIEFING_QUERY_KEY,

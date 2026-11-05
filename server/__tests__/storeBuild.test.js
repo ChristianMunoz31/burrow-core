@@ -565,9 +565,10 @@ describe('buildStore CLI helpers', () => {
   });
 
   it('puts the output outside the repo and names a test build apart', () => {
-    const env = { LOCALAPPDATA: 'C:\\Users\\example\\AppData\\Local' };
+    const LOCAL = path.join(os.tmpdir(), 'example', 'AppData', 'Local');
+    const env = { LOCALAPPDATA: LOCAL };
     const real = resolveOutDir({ root: ROOT, version: '0.4.1', localTest: false, outDir: null, env });
-    expect(real).toBe(path.resolve('C:\\Users\\example\\AppData\\Local', 'burrow-release', 'store', '0.4.1'));
+    expect(real).toBe(path.resolve(LOCAL, 'burrow-release', 'store', '0.4.1'));
     expect(resolveOutDir({ root: ROOT, version: '0.4.1', localTest: true, outDir: null, env })).toMatch(/0\.4\.1-localtest$/);
     expect(() => resolveOutDir({ root: ROOT, version: '0.4.1', localTest: false, outDir: path.join(ROOT, 'out'), env })).toThrow(/outside the repository/);
   });

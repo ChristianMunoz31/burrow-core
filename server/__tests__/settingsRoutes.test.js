@@ -186,10 +186,11 @@ describe('getDisplayName / sanitizeDisplayName', () => {
 });
 
 describe('GET /api/settings/network', () => {
-  it('lists the seven features, all off, in fixed order', async () => {
+  it('lists the six features, all off, in fixed order', async () => {
     const res = await request(app()).get('/api/settings/network');
     expect(res.status).toBe(200);
-    expect(res.body.features.map((f) => f.id)).toEqual(['weather', 'oura', 'sheets', 'cloudAi', 'aiLan', 'updates', 'license']);
+    expect(res.body.features.map((f) => f.id)).toEqual(['weather', 'oura', 'sheets', 'cloudAi', 'aiLan', 'updates']);
+    expect(res.body.features.map((f) => f.id)).not.toContain('license');
     expect(res.body.features.every((f) => f.enabled === false)).toBe(true);
     expect(res.body.features[0]).toMatchObject({ id: 'weather', label: 'Weather', hosts: ['api.open-meteo.com'] });
   });
@@ -223,7 +224,7 @@ describe('GET /api/settings/updates/check', () => {
 
   it('answers 200 { data } once enabled, with the status from GitHub', async () => {
     process.env.BURROW_NETWORK_OPTIN = 'updates';
-    const res = await request(app({ licenseStatus: () => ({ proSource: null }), installSupported: () => false })).get(
+    const res = await request(app({ installSupported: () => false })).get(
       '/api/settings/updates/check',
     );
     expect(res.status).toBe(200);
@@ -236,22 +237,21 @@ describe('GET /api/settings/updates/check', () => {
       source: 'release',
       canInstall: false,
       canDownload: false,
-      licenseImpact: 'free',
-      updatesUntil: null,
     });
+    expect(res.body.data).not.toHaveProperty('licenseImpact');
+    expect(res.body.data).not.toHaveProperty('updatesUntil');
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch.mock.calls[0][0]).toBe('https://api.github.com/repos/ChristianMunoz31/burrow-releases/releases/latest');
   });
 
   it('reads latest.json when this copy can install updates, and the releases API otherwise', async () => {
     process.env.BURROW_NETWORK_OPTIN = 'updates';
-    const licenseStatus = () => ({ proSource: null });
-    const manifestRes = await request(app({ licenseStatus, installSupported: () => true })).get('/api/settings/updates/check');
+    const manifestRes = await request(app({ installSupported: () => true })).get('/api/settings/updates/check');
     expect(manifestRes.body.data).toMatchObject({ status: 'available', source: 'manifest', canInstall: true });
     expect(fetch.mock.calls[0][0]).toBe('https://github.com/ChristianMunoz31/burrow-releases/releases/latest/download/latest.json');
     __resetUpdateCacheForTests();
     fetch.mockClear();
-    const releaseRes = await request(app({ licenseStatus, installSupported: () => false })).get('/api/settings/updates/check');
+    const releaseRes = await request(app({ installSupported: () => false })).get('/api/settings/updates/check');
     expect(releaseRes.body.data).toMatchObject({ status: 'available', source: 'release', canInstall: false });
     expect(fetch.mock.calls[0][0]).toContain('https://api.github.com/');
   });
@@ -277,9 +277,8 @@ describe('GET /api/settings/updates/check', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  describe('canInstall, canDownload and licenseImpact', () => {
+  describe('canInstall and canDownload', () => {
     const saved = { d: process.env.BURROW_DESKTOP, u: process.env.BURROW_SHELL_UPDATER, c: process.env.BURROW_CHANNEL };
-    const license = (over = {}) => ({ proSource: 'license', license: { updatesUntil: '2029-01-01T00:00:00Z' }, ...over });
     const data = async (deps) => (await request(app(deps)).get('/api/settings/updates/check')).body.data;
     beforeEach(() => {
       process.env.BURROW_NETWORK_OPTIN = 'updates';
@@ -295,21 +294,20 @@ describe('GET /api/settings/updates/check', () => {
     });
 
     it('canInstall is true only in the desktop app with the shell updater env var on the stable channel', async () => {
-      const licenseStatus = () => license();
-      expect((await data({ licenseStatus })).canInstall).toBe(false);
+      expect((await data()).canInstall).toBe(false);
       process.env.BURROW_DESKTOP = '1';
       __resetUpdateCacheForTests();
-      expect((await data({ licenseStatus })).canInstall).toBe(false);
+      expect((await data()).canInstall).toBe(false);
       process.env.BURROW_SHELL_UPDATER = '1';
       __resetUpdateCacheForTests();
-      expect((await data({ licenseStatus })).canInstall).toBe(true);
+      expect((await data()).canInstall).toBe(true);
       process.env.BURROW_SHELL_UPDATER = 'true';
       __resetUpdateCacheForTests();
-      expect((await data({ licenseStatus })).canInstall).toBe(false);
+      expect((await data()).canInstall).toBe(false);
       process.env.BURROW_SHELL_UPDATER = '1';
       delete process.env.BURROW_DESKTOP;
       __resetUpdateCacheForTests();
-      expect((await data({ licenseStatus })).canInstall).toBe(false);
+      expect((await data()).canInstall).toBe(false);
     });
 
     it('canInstall is false on the dev channel even with the env var', async () => {
@@ -320,54 +318,24 @@ describe('GET /api/settings/updates/check', () => {
     });
 
     it('canDownload follows the manual-download capability and is false by default outside the desktop app', async () => {
-      const licenseStatus = () => license({ proSource: null });
-      expect((await data({ licenseStatus })).canDownload).toBe(false);
-      expect((await data({ licenseStatus, manualSupported: () => true })).canDownload).toBe(true);
-      expect((await data({ licenseStatus, manualSupported: () => false })).canDownload).toBe(false);
+      expect((await data()).canDownload).toBe(false);
+      expect((await data({ manualSupported: () => true })).canDownload).toBe(true);
+      expect((await data({ manualSupported: () => false })).canDownload).toBe(false);
     });
 
-    it('licenseImpact is blocked for a paid license whose updates stop before the release', async () => {
-      const d = await data({ licenseStatus: () => license() });
-      expect(d).toMatchObject({ licenseImpact: 'blocked', updatesUntil: '2029-01-01T00:00:00Z' });
-    });
-
-    it('licenseImpact is included when the license covers the release, free for the trial and no license', async () => {
-      const cases = [
-        [() => license({ license: { updatesUntil: '2031-01-01T00:00:00Z' } }), 'included'],
-        [() => license({ proSource: 'local_trial' }), 'free'],
-        [() => ({ proSource: null, license: null }), 'free'],
-      ];
-      for (const [licenseStatus, impact] of cases) {
-        __resetUpdateCacheForTests();
-        expect(await data({ licenseStatus })).toMatchObject({ status: 'available', licenseImpact: impact });
-      }
-    });
-
-    it('licenseImpact is unknown when the license state cannot be read', async () => {
-      const d = await data({
-        licenseStatus: () => {
-          throw new Error('not initialised');
-        },
-      });
-      expect(d).toMatchObject({ status: 'available', licenseImpact: 'unknown', updatesUntil: null });
-    });
-
-    it('is computed per request: a license change shows up without clearing the update cache', async () => {
-      let status = license({ proSource: null });
-      const deps = { licenseStatus: () => status };
-      expect((await data(deps)).licenseImpact).toBe('free');
-      status = license();
-      expect((await data(deps)).licenseImpact).toBe('blocked');
-      expect(fetch).toHaveBeenCalledTimes(1);
+    it('carries no license impact or updates-until field', async () => {
+      const d = await data();
+      expect(d).toMatchObject({ status: 'available' });
+      expect(d).not.toHaveProperty('licenseImpact');
+      expect(d).not.toHaveProperty('updatesUntil');
     });
 
     it('adds nothing to current and unavailable results', async () => {
       fetch.mockResolvedValueOnce({ ok: false, status: 404, headers: new Map(), text: async () => '{}' });
-      const d = await data({ licenseStatus: () => license() });
+      const d = await data();
       expect(d).toMatchObject({ status: 'unavailable' });
       expect(d).not.toHaveProperty('canInstall');
       expect(d).not.toHaveProperty('canDownload');
-      expect(d).not.toHaveProperty('licenseImpact');
     });
   });
 

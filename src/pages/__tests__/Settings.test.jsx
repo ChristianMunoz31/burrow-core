@@ -5,7 +5,6 @@ import '@testing-library/jest-dom/vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Settings from '../Settings';
-import { LICENSE_QUERY_KEY } from '../../hooks/useLicense';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { ModeProvider } from '../../contexts/ModeContext';
 import { ToastProvider } from '../../contexts/ToastContext';
@@ -24,6 +23,18 @@ vi.mock('../../services/stateService', () => ({
     }),
   },
 }));
+
+// Whether the private module's UI is compiled in. The characters need it; a describe below flips it off.
+const build = vi.hoisted(() => ({ moduleIncluded: true }));
+vi.mock('../../extensions/proExtensions', async (importOriginal) => {
+  const real = await importOriginal();
+  return {
+    ...real,
+    get PRO_UI_INCLUDED() {
+      return build.moduleIncluded;
+    },
+  };
+});
 
 vi.mock('../../hooks/useJarvisStatus', () => ({
   useJarvisStatus: () => ({ status: null }),
@@ -86,11 +97,11 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   resetDom();
+  build.moduleIncluded = true;
 });
 
-function renderSettings(licenseStatus) {
+function renderSettings() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  if (licenseStatus) client.setQueryData(LICENSE_QUERY_KEY, licenseStatus);
   const utils = render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
@@ -108,8 +119,8 @@ function renderSettings(licenseStatus) {
 }
 
 // Let the initial background fetch settle so it cannot clobber a user change.
-async function mountSettings(licenseStatus) {
-  const utils = renderSettings(licenseStatus);
+async function mountSettings() {
+  const utils = renderSettings();
   await act(async () => {
     await Promise.resolve();
     await Promise.resolve();
@@ -558,17 +569,25 @@ describe('General: menu and Javi character', () => {
   });
 });
 
-describe('General: Javi characters are a Pro perk', () => {
-  it('known Free: a stale Pro value shows Butler, picking Valet saves nothing and shows the Pro notice', async () => {
-    server.map.set('javi:character', 'majordomo');
+describe('General: Javi characters', () => {
+  it('with the module compiled in, every character is selectable and saved, with no notice', async () => {
     const user = userEvent.setup();
-    await mountSettings({ pro: false });
-    expect(radio("Javi's character", 'Butler')).toBeChecked();
-    expect(radio("Javi's character", 'Valet')).not.toBeChecked();
+    await mountSettings();
     stateService.put.mockClear();
     await user.click(radio("Javi's character", 'Valet'));
-    expect(putCalls()).not.toContainEqual(['javi:character', 'valet']);
-    expect(document.querySelector('[data-capability="javi_characters"]')).not.toBeNull();
+    expect(radio("Javi's character", 'Valet')).toBeChecked();
+    expect(putCalls()).toContainEqual(['javi:character', 'valet']);
+    expect(document.querySelector('[data-capability="javi_characters"]')).toBeNull();
+  });
+
+  it('in a core-only build only Butler is offered, a saved other value shows Butler, with no label about a tier', async () => {
+    build.moduleIncluded = false;
+    server.map.set('javi:character', 'majordomo');
+    await mountSettings();
+    expect(within(group("Javi's character")).getAllByRole('radio')).toHaveLength(1);
+    expect(radio("Javi's character", 'Butler')).toBeChecked();
+    expect(group("Javi's character").textContent).not.toMatch(/\bpro\b|buy|upgrade/i);
+    expect(server.map.get('javi:character')).toBe('majordomo');
   });
 });
 

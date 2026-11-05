@@ -7,10 +7,8 @@ import {
 } from "../../utils/crossInsights";
 import AiUnavailable from "../shared/AiUnavailable";
 import Markdown from "../shared/Markdown";
-import { isFreeUi, useEntitlements } from "../../hooks/useEntitlements";
 import { useInsightsExplain } from "../../extensions/proExtensions";
-import { ProPill, ProPillDescription } from "../license/ProPill";
-import ProGateNotice from "../license/ProGateNotice";
+import NotIncludedNotice from "../shared/NotIncludedNotice";
 import { btnPrimary } from "../shared/formStyles";
 
 const DISALLOWED_ELEMENTS = ["img"];
@@ -21,8 +19,6 @@ const DISALLOWED_ELEMENTS = ["img"];
 function CrossInsightsCard() {
   const { result, loading } = useCrossInsights();
   const headingId = useId();
-  const entitlements = useEntitlements();
-  const proHintId = useId();
 
   // Stable identity of what Explain would send; a change means any shown explanation is stale.
   const summaryKey = useMemo(
@@ -42,7 +38,6 @@ function CrossInsightsCard() {
   } = useInsightsExplain({ result, summaryKey });
 
   if (loading || result.insights.length === 0) return null;
-  const free = isFreeUi(entitlements, 'explain');
 
   return (
     <section className="mb-5 glass rounded-2xl p-5" aria-labelledby={headingId}>
@@ -81,18 +76,15 @@ function CrossInsightsCard() {
             onClick={explain}
             aria-disabled={explaining}
             aria-busy={explaining}
-            aria-describedby={free ? proHintId : undefined}
             className={`${btnPrimary} shrink-0 self-start sm:self-auto ${
               explaining ? "opacity-50 cursor-not-allowed" : ""
             }`}
           >
             <Sparkles size={14} aria-hidden="true" />{" "}
             {explaining ? "Explaining…" : "Explain"}
-            {free && <ProPill className="ml-0.5" />}
           </button>
-          {free && <ProPillDescription id={proHintId} />}
         </div>
-        {proAttempted && <ProGateNotice capability="explain" className="mt-2" />}
+        {proAttempted && <NotIncludedNotice capability="explain" className="mt-2" />}
         {error &&
           (unavailable ? (
             <div className="mt-2">

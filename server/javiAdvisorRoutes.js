@@ -1,5 +1,4 @@
 import { isMultiTurnAdvice, validateAdviceRequest } from './javi/validateAdvice.js';
-import { assertPro, requireProWhen } from './pro.js';
 import { generateAdvice, streamAdvice } from './javi/advisorService.js';
 import { recordAudit } from './auditHook.js';
 import { captureDataGeneration } from './dataGeneration.js';
@@ -32,14 +31,10 @@ function errorBody(err) {
  * lookup. It is a query param, not a body key, so it cannot read as a multi-turn request.
  * AI that cannot run answers 503 JSON before any stream opens. Never echoes err.message or
  * request content.
- * Free gets one single-shot insight per page (no `messages` or thread keys). A follow-up or
- * conversation (`isMultiTurnAdvice`) is Pro (`javi_conversation`): Free gets 403 `pro_required`
- * before validation, the AI client and any SSE header, and Pro is checked again right after the
- * client is obtained, so a lapse during the wait still sends no model call and no audit row.
  * @param {import('express').Express} app
  */
 export function registerJaviAdvisorRoutes(app) {
-  app.post('/api/jarvis/advice', requireProWhen('javi_conversation', isMultiTurnAdvice), async (req, res) => {
+  app.post('/api/jarvis/advice', async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const v = validateAdviceRequest(req.body);
     if (!v.ok) return res.status(v.status).json({ error: v.error, code: v.code });
@@ -55,15 +50,6 @@ export function registerJaviAdvisorRoutes(app) {
       if (sendAiError(res, err)) return undefined;
       console.error('Javi advice error:', err?.name || 'unknown');
       return res.status(500).json({ error: 'Failed to get advice', code: 'server_error' });
-    }
-
-    if (isMultiTurnAdvice(req) || v.value.messages.length > 0) {
-      try {
-        assertPro('javi_conversation');
-      } catch (err) {
-        if (sendAiError(res, err)) return undefined;
-        throw err;
-      }
     }
 
     // Only the last user turn is logged next to the (already sanitized) page context.

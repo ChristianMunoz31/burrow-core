@@ -4,7 +4,6 @@
 // changed document is parsed a known, small number of times per scan (the inventory, the summary and the index each
 // re-read the file). The counts are measured through the worker factory seam with the real parser worker.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 

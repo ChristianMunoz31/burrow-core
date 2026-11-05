@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../../../hooks/useEntitlements', async () => (await import('../../../test-utils/entitlements.js')).entitlementsModule());
 import { cleanup, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import CrossInsightsCard from '../CrossInsightsCard';
 import { renderWithProviders } from '../../../test-utils/renderWithProviders';
+import { PRO_NOT_INCLUDED_COPY } from '../../../constants/proFeatures';
 import { expectCardAbsent } from '../../../test-utils/crossInsightsFixtures';
 
 const h = vi.hoisted(() => ({ state: {} }));
@@ -63,5 +64,19 @@ describe('empty and list states', () => {
     const text = document.body.textContent;
     expect(text).toMatch(/Correlation, not causation\. Tested across 6 pairs\./);
     expect(text).not.toMatch(/[–—]/);
+  });
+});
+
+describe('Explain in a core-only build', () => {
+  it('has no Pro pill, and a click shows the not-included notice with nothing to buy', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithProviders(<CrossInsightsCard />);
+    const button = screen.getByRole('button', { name: 'Explain' });
+    expect(button).toHaveAccessibleName('Explain');
+    expect(button).not.toHaveAccessibleDescription();
+    expect(container.textContent).not.toMatch(/\bpro\b|buy|upgrade|licen[sc]e|trial/i);
+    await user.click(button);
+    expect(await screen.findByText(PRO_NOT_INCLUDED_COPY)).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

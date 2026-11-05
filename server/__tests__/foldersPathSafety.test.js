@@ -137,8 +137,10 @@ describe('protected folders', () => {
     const sub = WIN ? 'AppData' : process.platform === 'darwin' ? 'Library' : '.config';
     const dir = path.join(home, sub, 'Some App');
     fs.mkdirSync(dir, { recursive: true });
-    expect(await check(dir)).toEqual({ ok: false, code: 'folder_protected' });
-    expect(await check(path.join(home, sub))).toEqual({ ok: false, code: 'folder_protected' });
+    // A dot folder (.config on Linux) is refused by the hidden rule, which runs before the protected roots.
+    const code = sub.startsWith('.') ? 'folder_hidden' : 'folder_protected';
+    expect(await check(dir)).toEqual({ ok: false, code });
+    expect(await check(path.join(home, sub))).toEqual({ ok: false, code });
   });
 
   it.runIf(WIN)('refuses folders named by the Windows environment (system, program files, ProgramData, APPDATA)', async () => {

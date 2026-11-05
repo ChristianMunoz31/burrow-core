@@ -46,7 +46,7 @@ afterEach(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
 describe('the developer route marker', () => {
   it('is the developer routes path', () => {
-    expect(DEV_TOOLS_ROUTE_MARKER).toBe('/dev/license');
+    expect(DEV_TOOLS_ROUTE_MARKER).toBe('/dev/status');
   });
 
   it('a stable bundle text with the route fails, a dev one passes', () => {

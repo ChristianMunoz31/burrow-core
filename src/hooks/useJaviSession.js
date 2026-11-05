@@ -6,7 +6,6 @@ import {
 } from '../constants/javiPages';
 import { requestJaviAdvice } from '../services/javiService';
 import { newId } from '../utils/ids';
-import { PRO_REQUIRED } from '../utils/apiError';
 
 /** @typedef {import('../services/javiService').JaviMessage} JaviMessage */
 /** @typedef {import('../services/javiService').WireMessage} WireMessage */
@@ -72,20 +71,6 @@ function reducer(state, action) {
         error: action.error,
         partial: '',
       }));
-    case 'collapse_to_card':
-      // Pro dropped to Free: keep at most the last automatic advice per page, drop every follow-up turn.
-      return Object.fromEntries(
-        Object.entries(state).map(([key, t]) => {
-          const card = [...t.messages].reverse().find((m) => m.role === 'assistant' && m.auto === true);
-          const collapsed = { ...t, messages: card ? [card] : [] };
-          if (t.lastRequestMessages?.length > 0) {
-            // A refused follow-up (stale Pro cache) keeps its pro_required error so the panel can show the Pro notice.
-            const error = t.error?.code === PRO_REQUIRED ? t.error : null;
-            return [key, { ...collapsed, status: 'idle', error, partial: '', lastRequestMessages: null }];
-          }
-          return [key, collapsed];
-        }),
-      );
     case 'reset':
       return {};
     default:
@@ -175,23 +160,20 @@ const toWire = (messages, ai) =>
  * own: only requestAdvice / sendMessage / retry do. Page context is read at call time.
  * `ai` is the live status ({ kind, host }): threads reset when it changes (a thread written under
  * one model is not carried to another) and earlier replies from a different kind are never resent.
- * `conversation` (false on Free) keeps the session to one automatic advice card per page: sendMessage
- * does nothing and retry only resends a request with no earlier messages.
- * @param {{ readPageContext: (key: string) => { context: string }, ai?: { kind?: string, host?: string | null } | null, conversation?: boolean }} deps
+ * Follow-ups (sendMessage) and retry work in every build.
+ * @param {{ readPageContext: (key: string) => { context: string }, ai?: { kind?: string, host?: string | null } | null }} deps
  */
-export function useJaviSession({ readPageContext, ai = null, conversation = true }) {
+export function useJaviSession({ readPageContext, ai = null }) {
   const [threads, dispatch] = useReducer(reducer, {});
   const threadsRef = useRef(threads);
   const controllers = useRef(new Map());
   const readRef = useRef(readPageContext);
   const aiRef = useRef(ai);
-  const convRef = useRef(conversation);
 
   useEffect(() => {
     threadsRef.current = threads;
     readRef.current = readPageContext;
     aiRef.current = ai;
-    convRef.current = conversation;
   });
 
   const run = useCallback(async (pageKey, wire, fresh = false) => {
@@ -271,7 +253,7 @@ export function useJaviSession({ readPageContext, ai = null, conversation = true
   const sendMessage = useCallback(
     (pageKey, text) => {
       const content = String(text ?? '').trim();
-      if (!convRef.current || !pageKey || !content || controllers.current.has(pageKey)) return;
+      if (!pageKey || !content || controllers.current.has(pageKey)) return;
       const existing = (threadsRef.current[pageKey] ?? EMPTY_THREAD).messages;
       const base = existing[existing.length - 1]?.role === 'user' ? existing.slice(0, -1) : existing;
       const message = { id: newId(), role: 'user', content, at: Date.now() };
@@ -286,7 +268,7 @@ export function useJaviSession({ readPageContext, ai = null, conversation = true
     (pageKey) => {
       if (!pageKey || controllers.current.has(pageKey)) return;
       const last = threadsRef.current[pageKey]?.lastRequestMessages;
-      if (!last || (!convRef.current && last.length > 0)) return;
+      if (!last) return;
       const wire = trimWire(last);
       dispatch({ type: 'retry_start', pageKey });
       run(pageKey, wire);
@@ -314,22 +296,6 @@ export function useJaviSession({ readPageContext, ai = null, conversation = true
     }
     if (aiKey !== null) prevAiKey.current = aiKey;
   }, [aiKey]);
-
-  // Pro dropped to Free while open: abort follow-ups in flight (an automatic advice keeps running)
-  // and collapse every page to its one advice card, so no follow-up turn is left on screen.
-  const prevConversation = useRef(conversation);
-  useEffect(() => {
-    if (prevConversation.current && !conversation) {
-      for (const [pageKey, entry] of controllers.current) {
-        if (entry.wire.length > 0) {
-          entry.controller.abort();
-          controllers.current.delete(pageKey);
-        }
-      }
-      dispatch({ type: 'collapse_to_card' });
-    }
-    prevConversation.current = conversation;
-  }, [conversation]);
 
   useEffect(() => {
     const map = controllers.current;

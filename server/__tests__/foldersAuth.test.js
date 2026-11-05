@@ -5,7 +5,6 @@ import request from 'supertest';
 
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 
 import fs from 'node:fs';
 import path from 'node:path';

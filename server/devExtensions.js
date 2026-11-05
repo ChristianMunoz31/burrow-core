@@ -6,7 +6,6 @@ import express from 'express';
 import { importDevExtension } from './devExtensionsLoader.js';
 import { isDevChannel } from './channel.js';
 import { devToolsCompiledIn, isReleaseBuild, isSourceCheckout } from './license/channelSeam.js';
-import { installLicenseDevHook } from './license/index.js';
 
 const router = express.Router();
 let active = false;
@@ -50,7 +49,6 @@ async function load({ env, log, importer, seams }) {
     ext.install(router, { env, log });
   } catch (err) {
     log(`dev extensions: install failed (${errCode(err)})`);
-    installLicenseDevHook(null);
     router.stack.length = 0;
     return false;
   }
@@ -83,10 +81,9 @@ export function devToolsActive() {
   return active;
 }
 
-/** Empties the router, uninstalls the license hook and forgets the install. For tests only. */
+/** Empties the router and forgets the install. For tests only. */
 export function resetDevExtensionsForTests() {
   router.stack.length = 0;
   active = false;
   loading = null;
-  installLicenseDevHook(null);
 }

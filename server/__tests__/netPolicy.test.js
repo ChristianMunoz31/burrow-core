@@ -53,12 +53,12 @@ afterEach(() => {
 
 describe('defaults', () => {
   it('every feature is off', async () => {
-    for (const id of ['weather', 'oura', 'sheets', 'cloudAi', 'aiLan', 'updates', 'license']) expect(await isEnabled(id)).toBe(false);
+    for (const id of ['weather', 'oura', 'sheets', 'cloudAi', 'aiLan', 'updates']) expect(await isEnabled(id)).toBe(false);
   });
 
   it('lists the features in fixed order with label, description and hosts', async () => {
     const { features } = await listNetworkFeatures();
-    expect(features.map((f) => f.id)).toEqual(['weather', 'oura', 'sheets', 'cloudAi', 'aiLan', 'updates', 'license']);
+    expect(features.map((f) => f.id)).toEqual(['weather', 'oura', 'sheets', 'cloudAi', 'aiLan', 'updates']);
     for (const f of features) {
       expect(f.enabled).toBe(false);
       expect(typeof f.label).toBe('string');
@@ -66,16 +66,11 @@ describe('defaults', () => {
       expect(f.hosts.length).toBeGreaterThan(0);
       expect(Object.keys(f).sort()).toEqual(['description', 'enabled', 'hosts', 'id', 'label']);
     }
-    expect(NETWORK_FEATURES).toHaveLength(7);
-    // The license feature is last and names both stores; only Activate and Move to another computer use it.
-    expect(NETWORK_FEATURES.at(-1)).toMatchObject({
-      id: 'license',
-      label: 'License activation',
-      hosts: ['api.gumroad.com', 'api.lemonsqueezy.com'],
-    });
-    expect(NETWORK_FEATURES.at(-1).description).toBe(
-      'Contacts Gumroad or Lemon Squeezy only when you click Activate or Move to another computer in Settings > License. Your license key goes to the store you bought from. Clicking one of those buttons turns this on.',
-    );
+    expect(NETWORK_FEATURES).toHaveLength(6);
+    // Burrow is free for everyone: there is no license feature and no store host in the registry.
+    expect(NETWORK_FEATURES.some((f) => f.id === 'license')).toBe(false);
+    expect(NETWORK_FEATURES.flatMap((f) => f.hosts)).not.toEqual(expect.arrayContaining(['api.gumroad.com']));
+    expect(NETWORK_FEATURES.flatMap((f) => f.hosts)).not.toEqual(expect.arrayContaining(['api.lemonsqueezy.com']));
     // The oura feature also covers testing a saved token, so it reaches only the Oura host.
     expect(NETWORK_FEATURES.find((f) => f.id === 'oura').hosts).toEqual(['api.ouraring.com']);
   });

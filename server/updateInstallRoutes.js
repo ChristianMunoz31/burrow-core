@@ -6,7 +6,6 @@
 // POST /api/settings/updates/manual serves a copy without a working shell updater (the placeholder key): it
 // re-checks, reads the pinned SHA256SUMS.txt, saves a backup and returns the pinned installer URL plus the expected
 // SHA-256 for the user's browser to download; it downloads no installer itself.
-// Both routes refuse (409 update_license_window) a license-based Pro user whose update window ended before the release.
 // Every step is injectable for tests.
 import { STABLE_VERSION_RE } from './channel.js';
 import { isBackupError } from './backup/errors.js';
@@ -19,10 +18,9 @@ import {
   isShellUpdaterAvailable,
   requestShellUpdate,
 } from './desktop/shellChannel.js';
-import { getLicenseStatus } from './license/index.js';
 import { networkRequiredBody, requireNetwork } from './netPolicy.js';
 import { recordNetworkCall } from './networkCall.js';
-import { checkForUpdate, fetchInstallerChecksum, installerUrl, licenseImpactFor, sumsUrl } from './updateCheck.js';
+import { checkForUpdate, fetchInstallerChecksum, installerUrl, sumsUrl } from './updateCheck.js';
 
 export const INSTALL_PATH = '/api/settings/updates/install';
 export const MANUAL_PATH = '/api/settings/updates/manual';
@@ -85,11 +83,6 @@ const ERRORS = Object.freeze({
     status: 500,
     message: "Burrow couldn't start the update. Close and reopen Burrow, then try again.",
   },
-  update_license_window: {
-    status: 409,
-    message:
-      "This update came out after your license's updates ended, so Pro would be off in it. Nothing was downloaded. Keep this version to keep Pro.",
-  },
   update_manual_unsupported: {
     status: 409,
     message: "This copy of Burrow can't get the installer for you. Download the new version from the releases page.",
@@ -116,17 +109,6 @@ const backupErrorCode = (err) => {
     : 'update_backup_failed';
 };
 
-const allowed = (impact) => impact === 'free' || impact === 'included';
-
-/** The license impact of an update; a license state that cannot be read counts as unknown (not allowed). */
-const impactOf = (licenseStatus, status) => {
-  try {
-    return licenseImpactFor(status, licenseStatus()).licenseImpact;
-  } catch {
-    return 'unknown';
-  }
-};
-
 const isValidBody = (body) =>
   body !== null &&
   typeof body === 'object' &&
@@ -144,7 +126,6 @@ const isValidBody = (body) =>
  *   createBackup?: typeof createBackup,
  *   requestShellUpdate?: typeof requestShellUpdate,
  *   recordNetworkCall?: typeof recordNetworkCall,
- *   licenseStatus?: () => object,
  *   now?: () => number,
  *   gate?: import('express').RequestHandler,
  *   limiter?: import('express').RequestHandler,
@@ -158,7 +139,6 @@ export function registerUpdateInstallRoute(app, deps = {}) {
     createBackup: backup = createBackup,
     requestShellUpdate: handoff = requestShellUpdate,
     recordNetworkCall: audit = recordNetworkCall,
-    licenseStatus = getLicenseStatus,
     now = Date.now,
     gate = requireNetwork('updates'),
     limiter = makeLimiter(5),
@@ -196,7 +176,6 @@ export function registerUpdateInstallRoute(app, deps = {}) {
       }
       if (status?.status === 'unavailable') return send(res, 'update_check_unavailable');
       if (status?.status !== 'available' || status.latest !== version) return send(res, 'update_not_available');
-      if (!allowed(impactOf(licenseStatus, status))) return send(res, 'update_license_window');
 
       let backupId = null;
       try {
@@ -231,14 +210,13 @@ export function registerUpdateInstallRoute(app, deps = {}) {
 
 /**
  * POST /api/settings/updates/manual: for a copy that cannot install by itself. Returns the pinned installer URL and
- * the expected SHA-256 after a fresh check, the license rule and a backup. Downloads no installer.
+ * the expected SHA-256 after a fresh check, and a backup. Downloads no installer.
  * @param {import('express').Express} app
  * @param {{
  *   isManualSupported?: () => boolean,
  *   installerArch?: () => 'x64' | 'arm64' | null,
  *   dataBusyCode?: () => 'backup_busy' | 'db_restoring' | null,
  *   checkForUpdate?: typeof checkForUpdate,
- *   licenseStatus?: () => object,
  *   fetchInstallerChecksum?: typeof fetchInstallerChecksum,
  *   createBackup?: typeof createBackup,
  *   now?: () => number,
@@ -252,7 +230,6 @@ export function registerManualDownloadRoute(app, deps = {}) {
     installerArch: archOf = () => installerArch(),
     dataBusyCode: busyCode = dataBusyCode,
     checkForUpdate: check = checkForUpdate,
-    licenseStatus = getLicenseStatus,
     fetchInstallerChecksum: fetchChecksum = fetchInstallerChecksum,
     createBackup: backup = createBackup,
     now = Date.now,
@@ -261,7 +238,7 @@ export function registerManualDownloadRoute(app, deps = {}) {
   } = deps;
 
   let inFlight = false;
-  // The backup of the last successful answer (per process). The license gate and the checksum re-check still run on
+  // The backup of the last successful answer (per process). The checksum re-check still runs on
   // every click; only the full backup is not repeated for the same version inside MANUAL_BACKUP_REUSE_MS.
   let lastBackup = null;
 
@@ -286,7 +263,6 @@ export function registerManualDownloadRoute(app, deps = {}) {
       }
       if (status?.status === 'unavailable') return send(res, 'update_check_unavailable');
       if (status?.status !== 'available' || status.latest !== version) return send(res, 'update_not_available');
-      if (!allowed(impactOf(licenseStatus, status))) return send(res, 'update_license_window');
 
       let checksum;
       try {

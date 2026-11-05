@@ -468,26 +468,6 @@ async function queryStableRelease({ fetchImpl, currentVersion, timeoutMs }) {
   });
 }
 
-/**
- * What installing `status` means for Pro. 'free' when Pro does not come from a license (free, trial, lapsed, none),
- * 'included' when the release is on or before the license's "updates until" date, 'blocked' when it is after, and
- * 'unknown' when a date cannot be read. null for anything that is not an available stable update. Pure: the caller
- * passes the license status (server/license getLicenseStatus()).
- * @param {{ status?: string, publishedAt?: string | null, channel?: string } | null | undefined} status
- * @param {{ proSource?: string | null, license?: { updatesUntil?: string } | null } | null | undefined} licenseStatus
- * @returns {{ licenseImpact: 'free' | 'included' | 'blocked' | 'unknown' | null, updatesUntil: string | null }}
- */
-export function licenseImpactFor(status, licenseStatus) {
-  if (status?.status !== 'available' || status.channel !== 'stable') return { licenseImpact: null, updatesUntil: null };
-  if (licenseStatus?.proSource !== 'license') return { licenseImpact: 'free', updatesUntil: null };
-  const until = licenseStatus.license?.updatesUntil;
-  const updatesUntil = typeof until === 'string' ? until : null;
-  const untilMs = updatesUntil === null ? Number.NaN : Date.parse(updatesUntil);
-  const releasedMs = typeof status.publishedAt === 'string' ? Date.parse(status.publishedAt) : Number.NaN;
-  if (Number.isNaN(untilMs) || Number.isNaN(releasedMs)) return { licenseImpact: 'unknown', updatesUntil };
-  return { licenseImpact: releasedMs <= untilMs ? 'included' : 'blocked', updatesUntil };
-}
-
 /** Newest first: published_at, then the date in the version. */
 const newerFirst = (a, b) => {
   if (a.publishedMs !== b.publishedMs) return b.publishedMs - a.publishedMs;

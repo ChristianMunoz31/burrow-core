@@ -10,7 +10,6 @@ import AppShell from '../AppShell';
 vi.mock('../BurgerMenu', () => ({ default: () => <div data-testid="burger" /> }));
 vi.mock('../TopBar', () => ({ default: () => null }));
 vi.mock('../../palette/LazyCommandPalette', () => ({ default: () => <div data-testid="palette" /> }));
-vi.mock('../../license/TrialNotice', () => ({ default: () => null }));
 vi.mock('../../javi/JaviAdvisor', () => ({ default: () => <div data-testid="javi" /> }));
 vi.mock('../../../hooks/useJaviSettings', () => ({ useJaviSettings: () => ({ showButton: true, autoAdvise: true }) }));
 

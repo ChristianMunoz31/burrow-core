@@ -1,8 +1,7 @@
-// Erase all my data removes the saved weather location (it is user data, not one of the kept license rows).
+// Erase all my data removes the saved weather location (it is user data).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getDb, upsert } from '../db/index.js';
 import { eraseAllData } from '../erase/eraseService.js';
-import { resetLicenseForTests } from '../license/index.js';
 import { WEATHER_LOCATION_KEY, getSavedWeatherLocation } from '../weatherLocation.js';
 import { cleanupBackupEnv } from './helpers/backupEnv.js';
 import { freshDb, stateKeys } from './helpers/eraseEnv.js';
@@ -11,7 +10,6 @@ beforeEach(() => {
   freshDb();
 });
 afterEach(() => {
-  resetLicenseForTests();
   cleanupBackupEnv();
 });
 

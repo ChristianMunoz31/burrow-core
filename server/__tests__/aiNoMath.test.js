@@ -6,7 +6,6 @@ import { closeTestDb, createTestDb, resetDb, seedDb } from './helpers/testDb.js'
 
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 
 import { advisorSystemPrompt, AUTO_ADVICE_REQUEST, AUTO_ADVICE_REQUEST_SMALL } from '../javi/advisorPrompt.js';
 import { buildBriefingContext } from '../dataAccess.js';

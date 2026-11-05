@@ -63,9 +63,22 @@ describe('workflows', () => {
     ['dev-build.yml', 'build'],
   ].filter(([file]) => hasPrivateFile(`.github/workflows/${file}`)))('%s job %s checks out burrow-pro, requires it and sets BURROW_REQUIRE_PRO=1', (file, job) => {
     const block = jobBlock(read(`.github/workflows/${file}`), job);
-    expect(block).toContain('repository: ChristianMunoz31/burrow-pro');
-    expect(block).toContain('ssh-key: ${{ secrets.BURROW_PRO_DEPLOY_KEY }}');
-    expect(block).toContain('path: pro');
+    if (block.includes('ssh://github.com/ChristianMunoz31/burrow-pro.git pro')) {
+      // Hand-rolled clone (desktop-windows.yml): on the hosted windows-11-arm image the key file actions/checkout
+      // writes keeps an ACE for Authenticated Users and Windows OpenSSH refuses it. The key must come from the secret
+      // through env into an ssh-agent (never a file), github.com's host key must be pinned and the agent stopped.
+      expect(block).toContain('BURROW_PRO_DEPLOY_KEY: ${{ secrets.BURROW_PRO_DEPLOY_KEY }}');
+      expect(block).toContain('-o User=git');
+      expect(block).toContain('StrictHostKeyChecking=yes');
+      expect(block).toContain('ssh-add -q -');
+      expect(block).toContain('ssh-agent -k');
+      expect(block).not.toContain('icacls');
+      expect(block).not.toContain('ssh-key:');
+    } else {
+      expect(block).toContain('repository: ChristianMunoz31/burrow-pro');
+      expect(block).toContain('ssh-key: ${{ secrets.BURROW_PRO_DEPLOY_KEY }}');
+      expect(block).toContain('path: pro');
+    }
     expect(block).toContain('run: node scripts/checks/proPresent.js');
     expect(block).toContain("BURROW_REQUIRE_PRO: '1'");
   });

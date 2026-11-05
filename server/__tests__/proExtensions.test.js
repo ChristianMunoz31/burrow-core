@@ -1,18 +1,15 @@
 // The Pro module seam (docs/adr/0001-open-core-split.md 3.2-3.8): the loader with an injected importer, the install
-// rollback, registration closing, the route table and the core gates every registration passes. Core test: it never
+// rollback, registration closing, the route table and the core hosts every registration passes. Core test: it never
 // imports pro/ and never installs the real module, so it behaves the same with and without pro/.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 
-import { FREE, PRO, resetPro, setEntitlements } from './helpers/pro.js';
 import { closeTestDb, createTestDb, resetDb } from './helpers/testDb.js';
 import {
   PRO_API_VERSION,
-  PRO_GATE,
   loadProExtensions,
   proModuleActive,
   proSlotRouter,
@@ -74,25 +71,22 @@ beforeAll(() => {
 beforeEach(() => {
   resetDb(db);
   resetProExtensionsForTests();
-  resetPro();
   log.mockReset();
   setFolderRouteHelpers(fakeFolderHelpers());
 });
 afterEach(() => {
   resetProExtensionsForTests();
-  resetPro();
 });
 afterAll(() => closeTestDb(db));
 
 describe('route table', () => {
-  it('lists the six Pro routes with used features, known slots and the frozen paths', () => {
+  it('lists the six Pro routes with registered features, known slots and the frozen paths', () => {
     expect(Object.keys(PRO_ROUTES).sort()).toEqual(
       ['folders.ask', 'folders.report', 'insights.explain', 'jarvis.action', 'jarvis.briefingRefresh', 'jarvis.run'].sort(),
     );
     for (const route of Object.values(PRO_ROUTES)) {
-      expect(PRO_FEATURES[route.feature]?.used).toBe(true);
       expect(PRO_SLOTS).toContain(route.slot);
-      expect(route.method).toBe('post');
+      expect(PRO_FEATURES[route.feature]).toBeTruthy();
       expect(Object.isFrozen(route)).toBe(true);
     }
     expect(PRO_ROUTES['jarvis.run'].path).toBe('/api/jarvis');
@@ -157,7 +151,6 @@ describe('loadProExtensions', () => {
     expect(proModuleActive()).toBe(false);
     runDataResetHooks();
     expect(reset).not.toHaveBeenCalled();
-    setEntitlements(PRO);
     const res = await request(slotApp()).post('/api/jarvis').send({});
     expect(res.status).toBe(501);
   });
@@ -214,39 +207,33 @@ describe('loadProExtensions', () => {
   });
 });
 
-describe('gates', () => {
-  it('every installed route carries a PRO_GATE first layer with the table feature', async () => {
+describe('route mounting (no tier gate, ADR 0002)', () => {
+  it('every installed route mounts the route table pre layers and handlers with no gate layer first', async () => {
     await loadProExtensions({ importer: async () => fakeModule().module, log });
     for (const route of Object.values(PRO_ROUTES)) {
       const outer = proSlotRouter(route.slot);
       const pro = outer.stack[0].handle;
       const layer = pro.stack.find((l) => l.route?.path === route.path);
       expect(layer, route.id).toBeTruthy();
-      expect(layer.route.stack[0].handle[PRO_GATE]).toBe(route.feature);
+      // Only the table's own pre layers, the AI gate when the table says so, and the one handler: no entitlement gate.
+      const expected = route.pre.length + (route.ai ? 1 : 0) + 1;
+      expect(layer.route.stack, route.id).toHaveLength(expected);
     }
   });
 
-  it('no module: every path answers 403 for Free and 501 for Pro', async () => {
+  it('no module: every path answers 501 pro_not_included, never 403', async () => {
     const app = slotApp();
     for (const route of Object.values(PRO_ROUTES)) {
-      setEntitlements(FREE);
-      const free = await request(app).post(concretePath(route.path)).set('Content-Type', 'application/json').send({});
-      expect(free.status, route.id).toBe(403);
-      expect(free.body).toMatchObject({ error: 'pro_required', feature: route.feature });
-      setEntitlements(PRO);
-      const pro = await request(app).post(concretePath(route.path)).set('Content-Type', 'application/json').send({});
-      expect(pro.status, route.id).toBe(501);
-      expect(pro.body).toEqual({ error: 'pro_not_included', code: 'pro_not_included', feature: route.feature, message: MSG_PRO_NOT_INCLUDED });
-      expect(pro.headers['cache-control']).toBe('no-store');
+      const res = await request(app).post(concretePath(route.path)).set('Content-Type', 'application/json').send({});
+      expect(res.status, route.id).toBe(501);
+      expect(res.body).toEqual({ error: 'pro_not_included', code: 'pro_not_included', feature: route.feature, message: MSG_PRO_NOT_INCLUDED });
+      expect(res.headers['cache-control']).toBe('no-store');
     }
   });
 
-  it('with a module: Free gets 403, Pro reaches the handler; requireJson runs before validators', async () => {
+  it('with a module: the handler runs with no license; requireJson runs before validators', async () => {
     await loadProExtensions({ importer: async () => fakeModule().module, log });
     const app = slotApp();
-    setEntitlements(FREE);
-    expect((await request(app).post('/api/insights/explain').send({})).status).toBe(403);
-    setEntitlements(PRO);
     const ok = await request(app).post('/api/insights/explain').send({});
     expect(ok.status).toBe(299);
     expect(ok.body.tag).toBe('insights.explain');

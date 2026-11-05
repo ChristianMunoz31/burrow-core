@@ -115,7 +115,7 @@ export function registerEraseRoutes(
 
   app.post(ERASE_PATH, noStore, requireSameOrigin, requireSignIn, refuseWhenBusy, eraseLimiter, requireJson, async (req, res) => {
     const body = req.body;
-    if (!isPlainObject(body) || !isOptionalBool(body.removeLicense) || !isOptionalBool(body.deleteBackups)) {
+    if (!isPlainObject(body) || !isOptionalBool(body.deleteBackups)) {
       return send(res, 'invalid_request');
     }
     const session = sessionKeyOf(req);
@@ -127,10 +127,9 @@ export function registerEraseRoutes(
       if (!verifyPassword(body.password)) return send(res, 'erase_password_invalid');
     }
     if (!tokens.consume(session, body.token)) return send(res, 'erase_token_used');
-    const removeLicense = body.removeLicense === true;
     const deleteBackups = body.deleteBackups === true;
     try {
-      const result = await erase({ removeLicense, deleteBackups });
+      const result = await erase({ deleteBackups });
       return res.json({ data: { erased: true, ...result } });
     } catch (e) {
       const known = isEraseError(e);

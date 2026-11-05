@@ -105,7 +105,7 @@ The first answer from Javi can be slow on a computer without a graphics card. La
 Burrow never updates on its own. Update checks are off until you turn them on in Settings > Updates (or click Check now there, which turns them on). With them on, Burrow asks GitHub whether a newer version exists when you open Settings, and shows what is new. Help > Check for updates... in the desktop app opens that section.
 
 - **Download and install.** If your copy can install updates, a card shows the new version and what is new. Nothing is downloaded until you click **Download and install**. Burrow then saves a backup of your data, the Burrow app downloads the installer from GitHub and checks its signature, and Burrow closes, installs the update and opens again. If the signature check fails, nothing is installed. Click **Later** to dismiss the card for now.
-- **Your Pro license.** If your Pro comes from a license and the new version came out after your updates ended, Burrow does not download it. The card says so before you click: keep your current version to keep Pro. Free and trial users always update.
+- **No update limits.** Burrow is free for everyone, so any version installs and runs fully. Nothing blocks an update.
 - **Get the installer.** If your copy cannot install updates, click **Get the installer**. Burrow saves a backup of your data, shows the installer's SHA-256 and the PowerShell `Get-FileHash` command to check it against, and your browser downloads the installer. Run it over your current copy. You can also download it from the [releases page](https://github.com/ChristianMunoz31/burrow-releases/releases/latest). Your data folder is kept either way.
 - Burrow Dev never installs updates itself.
 
@@ -120,7 +120,7 @@ Burrow never updates on its own. Update checks are off until you turn them on in
 - The Microsoft Store edition keeps its data in the same folder, unless it was built with the user folder location (docs/MICROSOFT_STORE.md, "If Partner Center refuses unvirtualizedResources"): then it is `%USERPROFILE%\Burrow Data` (for example `C:\Users\<name>\Burrow Data`), the server log is `%USERPROFILE%\Burrow Data\logs\server.log`, and the two editions do not share data. Settings shows the exact folder at the bottom of the page. Use **Import from your existing Burrow** in Settings > Data & storage to copy the data of the website edition into it; that only copies and leaves the original untouched.
 - Updating, reinstalling and uninstalling Burrow keep this folder.
 - To remove your data, close Burrow and delete the folder yourself. This cannot be undone, so export your data first if you want a copy.
-- To erase your data without deleting the folder, open Settings > Data & storage > Danger zone and choose **Erase all my data**. Burrow saves a final export to your Downloads folder first, keeps your license and Pro trial status, and starts over at first-run. The folder stays, so Help > Open data folder still works.
+- To erase your data without deleting the folder, open Settings > Data & storage > Danger zone and choose **Erase all my data**. Burrow saves a final export to your Downloads folder first, erases everything (including any license or trial files an older version left), and starts over at first-run. The folder stays, so Help > Open data folder still works.
 
 ## Help menu
 

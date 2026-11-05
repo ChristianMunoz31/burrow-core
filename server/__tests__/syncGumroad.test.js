@@ -262,8 +262,7 @@ describe('runSync with a fake CLI', () => {
     );
     writeJson('package.json', { version: '0.2.0' });
     fs.writeFileSync(path.join(root, 'CHANGELOG.md'), CHANGELOG);
-    writeJson('config/store.json', { gumroad: { proProductId: PRO, freeLicenseProductId: FREE } });
-    writeJson('config/gumroad-sync.json', { downloadProductId: DOWNLOAD });
+    writeJson('config/gumroad-sync.json', { proProductId: PRO, freeLicenseProductId: FREE, downloadProductId: DOWNLOAD });
   });
   afterEach(() => {
     for (const k of ['FAKE_STATE', 'FAKE_LOG', 'FAKE_BACKUP_DIR']) delete process.env[k];
@@ -273,7 +272,7 @@ describe('runSync with a fake CLI', () => {
 
   it('loadProducts reads the three ids and leaves out an empty one', () => {
     expect(loadProducts(root).map((p) => [p.key, p.id])).toEqual([['pro', PRO], ['free-license', FREE], ['download', DOWNLOAD]]);
-    writeJson('config/store.json', { gumroad: { proProductId: PRO, freeLicenseProductId: '' } });
+    writeJson('config/gumroad-sync.json', { proProductId: PRO, freeLicenseProductId: '', downloadProductId: DOWNLOAD });
     expect(loadProducts(root).map((p) => p.key)).toEqual(['pro', 'download']);
   });
 
@@ -349,7 +348,7 @@ describe('runSync with a fake CLI', () => {
   });
 
   it('a CLI failure (not signed in, unknown product) is explained and nothing is written', async () => {
-    writeJson('config/gumroad-sync.json', { downloadProductId: 'missing-id==' });
+    writeJson('config/gumroad-sync.json', { proProductId: PRO, freeLicenseProductId: FREE, downloadProductId: 'missing-id==' });
     await expect(runWith(opts({ publish: true, dryRun: false, yes: true }))).rejects.toThrow(/products view failed: product not found.*signed in/);
     expect(calls().some((c) => c.call === 'products update')).toBe(false);
     expect(fs.existsSync(backupDir)).toBe(false);

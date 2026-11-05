@@ -2,15 +2,14 @@
 //  - daily briefing build at BRIEFING_HOUR_LOCAL, only when AI is enabled and a model
 //    is available (a lazy, cached probe of the configured Ollama host);
 //  - audit-log prune shortly after startup and then once a day;
-//  - Folders re-scan (Pro, local AI only) every few hours for folders with the daily re-scan switch on.
-// The briefing and the re-scan are Pro jobs: the Pro module registers them (registerProScheduledJob), core keeps
-// the gates (server/pro.js); without Pro or without the module a job is skipped silently.
+//  - Folders re-scan (private module, local AI only) every few hours for folders with the daily re-scan switch on.
+// The briefing and the re-scan are provided by the private module (registerProScheduledJob); without the module
+// a job is skipped silently.
 // All timers are unref'd so they never keep the process alive.
 // The user's automatic backups switch does not affect these jobs (it only gates the backup
 // scheduler in server/backup/service.js).
 import { pruneAudit } from './audit.js';
 import { describeAi, isAiEnabled } from './ai/index.js';
-import { ProRequiredError, assertPro, proAccess } from './pro.js';
 import {
   dataBusy,
   drainScheduledJobs,
@@ -52,7 +51,7 @@ async function defaultAiConfigured() {
 
 let active = null; // { timers: Set<Timeout> } while running
 
-// Jobs the Pro module registers through server/proExtensions.js (ctx.scheduler.register). Core keeps the gates.
+// Jobs the private module registers through server/proExtensions.js (ctx.scheduler.register).
 const PRO_JOB_NAMES = new Set(['briefing', 'folderRescan']);
 /** @type {{ briefing?: Function, folderRescan?: Function }} */
 let proJobs = {};
@@ -115,25 +114,12 @@ export function startScheduler({
   };
 
   const briefingJob = async (signal) => {
-    // Briefings are a Pro capability: without Pro the job skips silently (no model call, no log).
-    try {
-      assertPro('briefings');
-    } catch (err) {
-      if (err instanceof ProRequiredError) return;
-      throw err;
-    }
     if (!(await aiConfigured())) return;
     // The data may have been reset while the AI check was awaited.
     if (signal?.aborted || isPaused() || dataBusy()) return;
     const run = briefing ?? proJobs.briefing;
     if (!run) return;
-    try {
-      await run({ trigger: 'scheduled', signal });
-    } catch (err) {
-      // Pro ended while aiConfigured() was awaited: the same silent skip as above.
-      if (err instanceof ProRequiredError) return;
-      throw err;
-    }
+    await run({ trigger: 'scheduled', signal });
   };
   const scheduleBriefing = () => arm(msUntilNextHour(briefingHour, now()), briefingJob, scheduleBriefing);
   const pruneJob = async () => {
@@ -142,12 +128,11 @@ export function startScheduler({
   };
   const schedulePrune = () => arm(DAY_MS, pruneJob, schedulePrune);
 
-  // The Pro module keeps its own Pro and local-only checks; core checks the capability and the pause and data-busy skip.
+  // The module keeps its own local-only checks; core checks the pause and data-busy skip.
   const folderJob = async (signal) => {
     if (isPaused() || dataBusy()) return;
     const run = folderRescan ?? proJobs.folderRescan;
     if (!run) return;
-    if (!proAccess('folder_auto_rescan').allowed) return;
     await run({ signal });
   };
   const scheduleFolders = () => arm(FOLDER_RESCAN_INTERVAL_MS, folderJob, scheduleFolders);

@@ -899,7 +899,7 @@ export function afterSteps({ tag, privacyChanged, outDir, published }) {
     '       https://github.com/ChristianMunoz31/burrow-releases/releases/latest/download/Burrow-Setup-x64.exe',
     '       https://github.com/ChristianMunoz31/burrow-releases/releases/latest/download/Burrow-Setup-arm64.exe',
     '       Get-FileHash -Algorithm SHA256 <file>   (compare with SHA256SUMS.txt)',
-    '  2. Gumroad pages (dry run, then publish and answer y):',
+    '  2. Optional, only while you keep the Gumroad pages up to date (Burrow is free for everyone, so skip this otherwise). Gumroad pages (dry run, then publish and answer y):',
     `       npm.cmd run release:gumroad -- --tag ${tag}`,
     `       npm.cmd run release:gumroad -- --tag ${tag} --publish`,
   ];

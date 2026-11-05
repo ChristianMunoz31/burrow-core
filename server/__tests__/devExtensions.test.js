@@ -10,7 +10,6 @@ vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 
 import { isExtensionNotFound } from '../devExtensionsLoader.js';
-import * as licenseIndex from '../license/index.js';
 import { devExtensionRouter, devToolsActive, loadDevExtensions, resetDevExtensionsForTests } from '../devExtensions.js';
 
 const ENV_KEYS = ['APP_PASSWORD', 'AUTH_SECRET', 'SECRETS_ENCRYPTION_KEY', 'BURROW_AI'];
@@ -52,7 +51,7 @@ describe('loadDevExtensions refuses', () => {
   it('a missing extension (the importer finds nothing)', async () => {
     expect(await load(async () => null)).toBe(false);
     expect(devToolsActive()).toBe(false);
-    const res = await request(seamApp()).get('/api/dev/license');
+    const res = await request(seamApp()).get('/api/dev/status');
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'not_found' });
   });
@@ -135,8 +134,7 @@ describe('loadDevExtensions failures', () => {
     expect(devToolsActive()).toBe(false);
   });
 
-  it('rolls back when install() throws: hook cleared, router emptied, not active', async () => {
-    const hook = vi.spyOn(licenseIndex, 'installLicenseDevHook');
+  it('rolls back when install() throws: router emptied, not active', async () => {
     const ext = {
       name: 'fake',
       available: () => true,
@@ -146,7 +144,6 @@ describe('loadDevExtensions failures', () => {
       }),
     };
     expect(await load(async () => ext)).toBe(false);
-    expect(hook).toHaveBeenCalledWith(null);
     expect(devExtensionRouter().stack).toHaveLength(0);
     expect(devToolsActive()).toBe(false);
     expect((await request(seamApp()).get('/api/dev/half')).status).toBe(404);
@@ -208,8 +205,8 @@ describe('server.js without a loaded extension', () => {
     app = (await import('../../server.js')).default;
   }, 60_000);
 
-  it('answers 404 not_found on /api/dev/license', async () => {
-    const res = await request(app).get('/api/dev/license').set('X-Forwarded-For', '198.51.100.7');
+  it('answers 404 not_found on /api/dev/status', async () => {
+    const res = await request(app).get('/api/dev/status').set('X-Forwarded-For', '198.51.100.7');
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'not_found' });
   });

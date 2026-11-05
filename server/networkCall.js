@@ -1,7 +1,6 @@
 // Names-only audit row for one outbound call: the netPolicy feature id and the host, nothing else.
 // The URL (path, query), headers, bodies, keys and prompts are never passed on. This file imports
-// only the audit hook at load time, so any module (including the license store adapters, which the
-// browser tests also load) can use it. The feature list from netPolicy is loaded on first use.
+// only the audit hook at load time, so any module can use it. The feature list from netPolicy is loaded on first use.
 // The reader is server/networkAudit.js.
 //
 // One row means one feature use, not one HTTP request. A feature that needs several requests

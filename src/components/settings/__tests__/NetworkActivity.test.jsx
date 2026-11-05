@@ -268,7 +268,8 @@ describe('VerifyYourself', () => {
     expect(text).not.toMatch(/[—–]/);
     expect(text).not.toMatch(/self.?host/i);
     expect(text).toMatch(/AGPL-3\.0-only/);
-    expect(text).toMatch(/Pro features are a private module/);
+    expect(text).toMatch(/A few features come from a private module that the official Burrow app includes at no cost/);
+    expect(text).not.toMatch(/\bBuy\b|\bPro\b|licen[sc]e|trial/);
     const link = screen.getByRole('link', { name: 'github.com/ChristianMunoz31/burrow-core' });
     expect(link).toHaveAttribute('href', 'https://github.com/ChristianMunoz31/burrow-core');
     expect(link.getAttribute('rel')).toContain('noopener');

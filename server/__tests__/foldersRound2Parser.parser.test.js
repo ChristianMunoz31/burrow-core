@@ -6,7 +6,6 @@
 // (L3 and L4 are in foldersRound2Fixes.test.js; L5, the no-replace rename, is covered by the Rust unit tests in src-tauri/src/dialogs.rs.)
 // Synthetic fixtures under os.tmpdir() only. The memory test inflates 96 MB in a real worker with a 32 MB watchdog.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 

@@ -38,7 +38,7 @@ export function nav(page) {
       await expect(drawer).toBeVisible();
       return drawer;
     },
-    /** A named section of the open drawer ('Budget', 'Productivity' or 'Health'). */
+    /** A named section of the open drawer ('Financials', 'Health' or 'Productivity'). */
     drawerSection(name) {
       return page.getByRole('dialog').getByRole('group', { name, exact: true });
     },
@@ -60,7 +60,7 @@ export function nav(page) {
     },
     /** Expands every section of the open drawer. */
     async openAllSections() {
-      for (const name of ['Budget', 'Productivity', 'Health']) await this.openSection(name);
+      for (const name of ['Financials', 'Health', 'Productivity']) await this.openSection(name);
     },
     /** Closes the drawer with Escape and waits until it has gone. */
     async closeDrawer() {

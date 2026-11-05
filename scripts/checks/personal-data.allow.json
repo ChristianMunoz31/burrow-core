@@ -148,7 +148,7 @@
       ]
     },
     {
-      "path": "config/store.json",
+      "path": "config/support.json",
       "strings": [
         "burrowsupport@gmail.com"
       ]

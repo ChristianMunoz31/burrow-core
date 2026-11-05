@@ -5,7 +5,6 @@
 //  (c) no prompt lists raw per-file sizes to add up,
 //  (d) every prompt carries the "exactly as written" rule.
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 

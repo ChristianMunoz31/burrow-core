@@ -27,7 +27,6 @@ test('erasing all data saves a final export, clears everything and returns to on
 
   const confirm = page.getByRole('alertdialog', { name: 'Erase everything now?' });
   await expect(confirm).toContainText('This cannot be undone.');
-  await expect(confirm).toContainText('Your Pro trial status is kept.');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),

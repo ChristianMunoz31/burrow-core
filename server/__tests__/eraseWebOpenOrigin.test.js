@@ -4,7 +4,6 @@
 // The limiter is per app instance, so this file has its own app import.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
-import { resetLicenseForTests } from '../license/index.js';
 import { cleanupBackupEnv } from './helpers/backupEnv.js';
 import { freshDb, rowCounts, seedEverything } from './helpers/eraseEnv.js';
 
@@ -28,7 +27,6 @@ beforeEach(() => {
   freshDb();
 });
 afterEach(() => {
-  resetLicenseForTests();
   cleanupBackupEnv();
 });
 

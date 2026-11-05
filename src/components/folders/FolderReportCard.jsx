@@ -1,18 +1,16 @@
 import { Suspense } from 'react';
 import { FolderReportWriter } from '../../extensions/proExtensions';
-import { isFreeUi, useEntitlements } from '../../hooks/useEntitlements';
-import ProGateNotice from '../license/ProGateNotice';
+import NotIncludedNotice from '../shared/NotIncludedNotice';
 import { REPORT_HEADING, formatDate } from '../../constants/folders';
 
 /**
  * The cross-file report of one folder (themes, related files, things worth a look). Everyone can read a report that
- * exists; writing a new one is Pro and lives in the Pro module's writer. Without Pro, or in a build without the
- * Pro module, the panel shows the upgrade notice. The text is plain.
+ * exists; writing a new one lives in the private module's writer. In a build without that module the panel
+ * shows the not-included notice. The text is plain.
  * @param {{ folder: object, busy: boolean }} props
  */
 export default function FolderReportCard({ folder, busy }) {
-  const entitlements = useEntitlements();
-  const gated = isFreeUi(entitlements, 'folder_report') || !FolderReportWriter;
+  const gated = !FolderReportWriter;
   const label = `${REPORT_HEADING}: ${folder.name}`;
   const report = folder.report;
   return (
@@ -24,7 +22,7 @@ export default function FolderReportCard({ folder, busy }) {
         </>
       )}
       {gated ? (
-        <ProGateNotice capability="folder_report" />
+        <NotIncludedNotice capability="folder_report" />
       ) : (
         <Suspense fallback={null}>
           <FolderReportWriter folder={folder} busy={busy} />

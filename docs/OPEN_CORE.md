@@ -2,13 +2,13 @@
 
 Internal developer document. It describes the open-core split of [ADR 0001](adr/0001-open-core-split.md) in plain words: what lives in core, what lives in the private `pro/` module, and the exact contract between them.
 
-**Status: planned.** The split is implemented in the private repo. The core has not been published. Until the owner has created the public core repository (runbook: [PUBLISHING_CORE.md](PUBLISHING_CORE.md)), no README, in-app text, store page, Gumroad text or other public copy may say that Burrow is open source, AGPL, or buildable or self-hostable from public source. This document may describe the plan as planned.
+**Status: implemented, core published.** The core is public under AGPL-3.0-only at https://github.com/ChristianMunoz31/burrow-core (published 2026-11-04; runbook: [PUBLISHING_CORE.md](PUBLISHING_CORE.md)). Copy may say the core is open source and AGPL; it never says the private module is open source or that its source is public, and it never offers Docker self-hosting. Since 2026-11-05 Burrow is free for everyone ([ADR 0002](adr/0002-free-for-everyone.md)): there are no tiers, no trial and no license keys, so the module is a build-time seam only. Where [ADR 0001](adr/0001-open-core-split.md) describes Free and Pro tiers, entitlement gates or upsell UI, ADR 0002 supersedes it.
 
 ## 1. The idea in one paragraph
 
-Burrow core is planned to be published under AGPL-3.0-only. Pro features live in `pro/`, a separate private git repo that is nested inside the core checkout and ignored by it. Core owns every gate: a Pro capability is always checked by public core code (`server/pro.js`, `server/license/**`), and the Pro module can only plug into a fixed list of places. It reaches data, the network and AI only through a named list of audited core APIs (section 5). With `pro/` present, every build includes Pro. With `pro/` absent you get a working Free build.
+Burrow core is published under AGPL-3.0-only. Some features (Javi questions and approved changes, daily briefings, Explain, folder questions and reports, the extra Javi characters, the scheduled folder re-scan) live in `pro/`, a separate private git repo that is nested inside the core checkout and ignored by it. The module can only plug into a fixed list of places, and it reaches data, the network and AI only through a named list of audited core APIs (section 5). With `pro/` present, every official build includes the module and every feature is on, at no cost. With `pro/` absent you get a working core-only build that says "not included in this build" for those features.
 
-Rule for placing code: if Free uses it, it is core. If only Pro uses it, it goes in `pro/`. Exception: code that touches stored data stays core even when only Pro calls it (for example `server/folders/store.js`).
+Rule for placing code: if the core uses it, it is core. If only the module uses it, it goes in `pro/`. Exception: code that touches stored data stays core even when only Pro calls it (for example `server/folders/store.js`).
 
 Public wording about the isolation (risk R1): "Pro can only use the public, audited core APIs; this rule is enforced in our build." Never write "you can verify Pro's source". Pro runs in the same Node process as core, and the allowlist is enforced by a public test and a public esbuild plugin, but only where the Pro source exists (the owner's builds).
 
@@ -66,18 +66,20 @@ A thenable returned by `install` counts as an install failure. A Pro module must
 | `javi.registerCharacters(texts)` | `{ valet?, concierge?, majordomo? }`, each with the 8 string fields of the butler entry |
 | `onDataReset(fn)` | Forwarded to `server/dataGeneration.js` `onDataReset`; ignored after a rollback |
 
-There is no prompt registration. Free prompt scaffolding stays core (`server/javi/advisorPrompt.js`, `server/javi/userName.js`, the core part of `server/folders/prompts.js`).
+There is no prompt registration. Core prompt scaffolding stays core (`server/javi/advisorPrompt.js`, `server/javi/userName.js`, the core part of `server/folders/prompts.js`).
 
-### 3.2 Every registration passes a core gate
+### 3.2 Every registration goes through a core seam
 
-| Registration | Core gate (public) | Behaviour when no module is installed |
+There is no entitlement or license check (ADR 0002): the only condition is whether the module is installed. With it, the registered code runs; without it, the core fallback below applies.
+
+| Registration | Core seam (public) | Behaviour when no module is installed |
 | --- | --- | --- |
-| `routes.add` | `requirePro(feature)` is the first layer, mounted by core | Fallback route: `requirePro(feature)` then `501 pro_not_included` |
-| `folders.setJobHooks.index` | `server/folders/jobs.js` index phase: `proAccess('folder_qa')` | `indexSkipped = 'not_pro'` |
-| `folders.setJobHooks.report` | `server/folders/jobs.js` report run: `assertPro('folder_report')` | The job fails with `folder_failed` (the route is a fallback anyway) |
-| `scheduler.register('briefing')` | `server/scheduler.js` briefing job: `assertPro('briefings')` plus `aiConfigured()` | The job returns silently |
-| `scheduler.register('folderRescan')` | `server/scheduler.js` folder job: `proAccess('folder_auto_rescan')` (the Pro module keeps its own check too) | The job returns silently |
-| `javi.registerCharacters` | `server/javi/characters.js` `getCharacter`: `proAccess('javi_characters')` and a registered text | Butler |
+| `routes.add` | Core mounts the route layers for the id in `PRO_ROUTES` | Fallback route: `501 pro_not_included` |
+| `folders.setJobHooks.index` | `server/folders/jobs.js` index phase calls the hook | The index phase is skipped |
+| `folders.setJobHooks.report` | `server/folders/jobs.js` report run calls the hook | The job fails with `folder_failed` (the route is a fallback anyway) |
+| `scheduler.register('briefing')` | `server/scheduler.js` briefing job (with `aiConfigured()`) | The job returns silently |
+| `scheduler.register('folderRescan')` | `server/scheduler.js` folder job | The job returns silently |
+| `javi.registerCharacters` | `server/javi/characters.js` `getCharacter`: returns the chosen character when its text is registered | Butler |
 
 ### 3.3 The 6 Pro routes (`server/proRoutes.js`)
 
@@ -92,16 +94,15 @@ There is no prompt registration. Free prompt scaffolding stays core (`server/jav
 | `folders.report` | folders | post | `/api/folders/:id/report` | `folder_report` | `['aiLimiter']` | null |
 | `folders.ask` | folders | post | `/api/folders/:id/ask` | `folder_qa` | `['aiLimiter', 'requireJson']` | null |
 
-For `add({ id, validate, handlers })` core mounts these layers in this order: `requirePro(feature)`, then `pre` (resolved per request from the latest folder helpers), then `validate`, then `requireAi(purpose, enabledOnly ? { enabledOnly: true } : undefined)` when `ai` is set, then `handlers`. Each gate function core mounts carries a non-enumerable symbol `PRO_GATE` equal to the feature, so a test can inspect the stack. `add` throws on an unknown id, a second `add` of the same id, empty `handlers` or a non-function entry.
+For `add({ id, validate, handlers })` core mounts these layers in this order: `pre` (resolved per request from the latest folder helpers), then `validate`, then `requireAi(purpose, enabledOnly ? { enabledOnly: true } : undefined)` when `ai` is set, then `handlers`. `add` throws on an unknown id, a second `add` of the same id, empty `handlers` or a non-function entry.
 
-Slots are routers that core mounts synchronously: `jarvis` in `server.js` (after `GET /api/jarvis/status`, before the `/api` 404), `insights` in `server.js`, and `folders` inside `registerFolderRoutes` (before the `/api/folders` error handler). Each slot router is the Pro router followed by a fallback router that core fills at module load from `PRO_ROUTES`. So a test that imports `app` sees Free behaviour (403 for Free entitlements, 501 for Pro entitlements) unless it installs the module.
+Slots are routers that core mounts synchronously: `jarvis` in `server.js` (after `GET /api/jarvis/status`, before the `/api` 404), `insights` in `server.js`, and `folders` inside `registerFolderRoutes` (before the `/api/folders` error handler). Each slot router is the Pro router followed by a fallback router that core fills at module load from `PRO_ROUTES`. So a test that imports `app` sees the core-only behaviour (`501 pro_not_included`) unless it installs the module.
 
 ### 3.4 `server/proExtensions.js`
 
 | Export | Meaning |
 | --- | --- |
 | `PRO_API_VERSION` | `1` |
-| `PRO_GATE` | `Symbol('burrow.proGate')` |
 | `proSlotRouter(slot)` | `'jarvis'`, `'insights'` or `'folders'`; one `express.Router` per slot |
 | `setFolderRouteHelpers(helpers)` | Called by `registerFolderRoutes`; the latest call wins |
 | `loadProExtensions({ env, log, importer })` | `Promise<boolean>` |
@@ -146,14 +147,13 @@ Pro registers into these. They may be called only by `server/proExtensions.js` a
 | Item | Value |
 | --- | --- |
 | Status and body | `501 { error: 'pro_not_included', code: 'pro_not_included', feature, message }`, header `Cache-Control: no-store` |
-| Fixed copy | `MSG_PRO_NOT_INCLUDED` = "This build of Burrow does not include Burrow Pro features. Your data and everything in Burrow Free keep working." (`server/pro.js`; the client mirror is `PRO_NOT_INCLUDED_COPY` in `src/constants/proFeatures.js`, identical text) |
+| Fixed copy | `MSG_PRO_NOT_INCLUDED` = "This build of Burrow does not include this feature. The official Burrow app includes it at no cost." (`server/pro.js`; the client mirror is `PRO_NOT_INCLUDED_COPY` in `src/constants/proFeatures.js`, identical text) |
 | Server helper | `sendProNotIncluded(feature)` in `server/pro.js` returns the middleware |
 | Client | `PRO_NOT_INCLUDED = 'pro_not_included'` and `isProNotIncludedError(err)` in `src/utils/apiError.js` |
-| Order | A Free entitlement always gets the existing `403 pro_required` first (including `newer_license_required`). Only a request that passes `requirePro` reaches the 501 |
-| Where | Exactly the 6 `PRO_ROUTES` paths, when no module is installed |
+| Where | Exactly the 6 `PRO_ROUTES` paths, when no module is installed. There is no `403 pro_required` any more |
 | `/api/app/info` | Adds `proModule: boolean` (`proModuleActive()`) |
 
-The error is also listed in [LICENSING.md](LICENSING.md) section 10.7.
+The UI shows the same text as "not included in this build" (`NotIncludedNotice`). It never offers to buy, upgrade or start a trial.
 
 ## 5. The import allowlist (two tiers)
 
@@ -170,7 +170,6 @@ Named imports only from the listed names. `*` means any export (a namespace impo
 | `server/netPolicy.js` | `NetworkOptInError`, `assertNetworkEnabled` |
 | `server/networkCall.js` | `recordNetworkCall`, `statusFromHttp` |
 | `server/pro.js` | `*` |
-| `server/license/index.js` | `getEntitlements` |
 | `server/auditHook.js` | `recordAudit` |
 | `server/integrations.js` | `fetchWeather`, `fetchOura` (each runs `assertNetworkEnabled` then `recordNetworkCall`) |
 | `server/secrets/index.js` | `peekSecret` |
@@ -215,25 +214,23 @@ Hooks are static, because the module is a build-time constant. Components are `R
 
 | Export | Kind | Props or return | Core host | Core default and host fallback |
 | --- | --- | --- | --- | --- |
-| `PRO_UI_INCLUDED` | constant | `boolean` | `src/hooks/useEntitlements.js` (`isFreeUi`, `isProNotIncluded`), `ProGateNotice`, `TrialNotice` | `false` |
+| `PRO_UI_INCLUDED` | constant | `boolean` | Core hosts that show `NotIncludedNotice` | `false` |
 | `useJaviAgent` | hook | `() => { messages, tools, actions, pendingCount, running, error, errorCode, errorReason, send(text, { page }), stop(), reset(), respond(token, approve) }` | `JaviAdvisor.jsx` | `useNoJaviAgent`: a frozen `NO_JAVI_AGENT` with empty fields, `pendingCount: 0`, no-op functions, and `respond` resolving `{ status: 'error', name: null }` |
 | `agentToolLabel` | function | `(name: string) => string` | `JaviPanel.jsx` tool chips | `() => ''` |
 | `AGENT_UNREACHABLE_MESSAGE` | constant | `string \| null` | `JaviPanel.jsx` agent error row | `null` |
 | `JaviComposer` | lazy component | `{ inputRef, prefill: { id, text } \| null, loading, focusSeq, onSend(text) }` | `JaviPanel.jsx` dock | `null`: no dock |
 | `ConfirmActionCard` | lazy component | `{ action, onRespond(token, approve) }` | `JaviPanel.jsx` timeline | `null`: `action` items are not rendered |
 | `BriefingMessage` | lazy component | `{ announce(text) }` | `JaviHomeCard.jsx` | `null`: `showBriefing` is false |
-| `useInsightsExplain` | hook | `({ result, summaryKey }) => { explaining, explanation, error, unavailable, unavailableReason, unavailableMessage, proAttempted, explain() }` | `CrossInsightsCard.jsx` | `useNoInsightsExplain`: `explain()` sets `proAttempted` (shows the existing upsell), other fields empty |
-| `FolderAskPanel` | lazy component | `{ folder }` (calls the Pro service itself) | `FolderCard.jsx` | `null`: the host renders `<ProGateNotice capability="folder_qa" />` |
-| `FolderReportWriter` | lazy component | `{ folder, busy }` | `FolderReportCard.jsx` (keeps the free read view of an existing report) | `null`: the host renders `<ProGateNotice capability="folder_report" />` |
+| `useInsightsExplain` | hook | `({ result, summaryKey }) => { explaining, explanation, error, unavailable, unavailableReason, unavailableMessage, explain() }` (the core default also returns `proAttempted`; the module's hook does not need to) | `CrossInsightsCard.jsx` | `useNoInsightsExplain`: `explain()` only sets `proAttempted`, so the card shows `NotIncludedNotice`; other fields empty |
+| `FolderAskPanel` | lazy component | `{ folder }` (calls the module's service itself) | `FolderCard.jsx` | `null`: the host renders `NotIncludedNotice` |
+| `FolderReportWriter` | lazy component | `{ folder, busy }` | `FolderReportCard.jsx` (keeps the read view of an existing report) | `null`: the host renders `NotIncludedNotice` |
 
-### 6.1 `isFreeUi` and `isProNotIncluded`
+### 6.1 `PRO_UI_INCLUDED` and `NotIncludedNotice`
 
-Upsell parity: disabled controls, `ProPill`, `BuyProLink`, the "(Pro)" options of the character picker and the auto re-scan switch stay in core.
+The only condition anywhere in the UI is `PRO_UI_INCLUDED` from `src/extensions/proExtensions.js`.
 
-- `isFreeUi(e, feature) = !PRO_UI_INCLUDED || isKnownFree(e, feature)` (`src/hooks/useEntitlements.js`). Core hosts use it so a build without the Pro UI never shows a control it cannot serve.
-- `isProNotIncluded(e) = !PRO_UI_INCLUDED && e.known && (e.pro || e.proScope === 'features_until')`. When it is true, `ProGateNotice` shows `PRO_NOT_INCLUDED_COPY` with no buy link. Otherwise it behaves as before.
-- `TrialNotice` renders nothing when `!PRO_UI_INCLUDED`.
-- Settings > License shows "Burrow Pro features: not included in this build" when `/api/app/info` `proModule` is false.
+- With the module, every control works and nothing is gated.
+- Without it, core hosts render `src/components/shared/NotIncludedNotice.jsx`, which shows `PRO_NOT_INCLUDED_COPY` ("This build of Burrow does not include this feature. The official Burrow app includes it at no cost."). There is no buy link, upgrade prompt or trial.
 
 ## 7. Bundle budget
 
@@ -243,26 +240,26 @@ Core budget keys are measured over assets not named `pro-*`, in both modes, and 
 
 | Build | `pro/` present | `pro/` absent |
 | --- | --- | --- |
-| `npm run dev` (Vite) | Pro UI swapped in | Core empty module, Free UI |
-| `npm start` (unbundled) | Loader imports `pro/server/index.js`, `proModule: true` | Loader returns null, Pro paths answer 403 or 501, `proModule: false` |
-| `npm run build` | `dist/` with `assets/pro-*` | Free `dist/`; fails only with `BURROW_REQUIRE_PRO=1` |
-| `npm run desktop:sidecar` (stable, direct) | `static.js` bundled, `BURROW_PRO=on`, `dist/` must have Pro chunks | Free sidecar, `BURROW_PRO=off`, warning; fails with `--require-pro` |
+| `npm run dev` (Vite) | Module UI swapped in | Core empty module, core-only UI |
+| `npm start` (unbundled) | Loader imports `pro/server/index.js`, `proModule: true` | Loader returns null, the 6 module paths answer 501, `proModule: false` |
+| `npm run build` | `dist/` with `assets/pro-*` | Core-only `dist/`; fails only with `BURROW_REQUIRE_PRO=1` |
+| `npm run desktop:sidecar` (stable, direct) | `static.js` bundled, `BURROW_PRO=on`, `dist/` must have `pro-*` chunks | Core-only sidecar, `BURROW_PRO=off`, warning; fails with `--require-pro` |
 | `npm run desktop:sidecar -- --channel dev` | As stable (devtools rules unchanged) | As stable |
 | `npm run release:store` | Builds | Refuses (`check:pro-present`, require-pro implied) |
 | Official release (`release:auto`, `release:local`, `release:installer`, release workflows) | Builds | Refuses |
-| Docker (internal) | Image holds `pro/server` source and the Pro UI in `dist/` | Free image |
-| Release zip (`release.yml` assets) | Free only: the job never checks out `pro/` and asserts absent | Free |
-| Public CI (`ci.yml`) | Not applicable (never checked out) | Free, asserts absent |
-| Vitest | Core suites (Free behaviour) plus Pro suites | Core suites |
+| Docker (internal) | Image holds `pro/server` source and the module UI in `dist/` | Core-only image |
+| Release zip (`release.yml` assets) | Core only: the job never checks out `pro/` and asserts absent | Core only |
+| Public CI (`ci.yml`) | Not applicable (never checked out) | Core only, asserts absent |
+| Vitest | Core suites (core-only behaviour) plus module suites | Core suites |
 | Playwright | Core projects plus `pro-flows` | Core projects |
-| `npm run desktop:dev` | Includes Pro; the stamp tracks it | Free |
+| `npm run desktop:dev` | Includes the module; the stamp tracks it | Core only |
 | `npm run export:core` | Output never contains `pro/` or `devtools/` | Same |
 
 Build seams (ADR 3.10):
 
 - esbuild plugin `burrow-pro` (`proPlugin` in `scripts/desktop/workerBundle.js`, used next to `devToolsPlugin`) swaps `server/proExtensionsLoader.js` for `pro/server/static.js` or for `server/proExtensionsLoader.none.js`, checks every import under `pro/server` against section 5, and with `requirePro` fails with "An official build needs the Pro module but pro/server/static.js is missing".
 - The define `__BURROW_PRO__` and the banner line `/*! BURROW_PRO=on */` or `/*! BURROW_PRO=off */` (second banner line, after the channel line). `proCompiledIn()` in `server/license/channelSeam.js` reads the define.
-- Require-pro is on with `--require-pro`, `BURROW_REQUIRE_PRO=1` or `--distribution store`. Without it and without `pro/`, `buildSidecar.js` succeeds as Free with the warning `Building without the Pro module: Free build (BURROW_PRO=off)`.
+- Require-pro is on with `--require-pro`, `BURROW_REQUIRE_PRO=1` or `--distribution store`. Without it and without `pro/`, `buildSidecar.js` succeeds as a core-only build with a warning that it builds without the Pro module (`BURROW_PRO=off`).
 - `node scripts/checks/channelMarker.js --expect-pro present|absent` (with `--bundle` for the banner and `--dist-dir` for `assets/pro-*.js`) and `node scripts/release/smokeSidecar.js --expect-pro present|absent` verify what was built.
 - `npm run check:pro-present` (`scripts/checks/proPresent.js`) requires `pro/server/index.js`, `pro/server/static.js`, `pro/ui/proExtensions.js` and `pro/LICENSE`, and exits 1 with a fixed message when one is missing.
 
@@ -292,13 +289,13 @@ vi.mock('../../../src/extensions/proExtensions.js', async () =>
 pro.real = await import('../proExtensions.js');
 ```
 
-The ADR's literal form `vi.mock('<rel>/src/extensions/proExtensions.js', async () => await import('<rel>/pro/ui/proExtensions.js'))` deadlocks Vitest: the Pro module's hooks import `src/hooks/useEntitlements.js`, which imports the mocked module while its factory is still pending. `pro/ui/test-utils/proExtensionsMock.js` returns one getter per `PRO_EXTENSION_NAMES` entry that reads the real module at render time, so the effect is the same: the real Pro module replaces the core one.
+The ADR's literal form `vi.mock('<rel>/src/extensions/proExtensions.js', async () => await import('<rel>/pro/ui/proExtensions.js'))` deadlocks Vitest: the module's hooks import core files that import the mocked module while its factory is still pending. `pro/ui/test-utils/proExtensionsMock.js` returns one getter per `PRO_EXTENSION_NAMES` entry that reads the real module at render time, so the effect is the same: the real Pro module replaces the core one.
 
 Vitest has no Vite plugins, so tests always see the core `src/extensions/proExtensions.js` (Free behaviour) unless they mock it like this. Server tests that need the Pro module call `installProModuleForTests()` and `uninstallProModuleForTests()` from `server/__tests__/helpers/proModule.js`. Only files under `pro/` may import that helper. Core suites never install the module and pass identically in both modes.
 
-### Without `pro/` (Free mode, and QA)
+### Without `pro/` (core-only mode, and QA)
 
-To test Free mode, move `pro/` OUTSIDE the repo, run the core checks, and move it back:
+To test core-only mode, move `pro/` OUTSIDE the repo, run the core checks, and move it back:
 
 ```powershell
 Move-Item pro "$env:TEMP\burrow-pro-aside"
@@ -310,7 +307,7 @@ git -C pro status --short       # expect no output
 
 Never rename `pro/` to another name inside the repo. It would show up as untracked core files and a later `git add -A` could commit a nested repo into core (risk R10). The full QA command lists for both modes are in [adr/0001-work-split.md](adr/0001-work-split.md) section 7.
 
-Preview branch worktrees (`npm run preview:branch`) have no `pro/` and run in Free mode.
+Preview branch worktrees (`npm run preview:branch`) have no `pro/` and run in core-only mode.
 
 ## 10. Provenance rule for the Tauri Local-AI Starter Kit (risk R14)
 
@@ -329,12 +326,12 @@ These answer the open questions O1 to O7 of the ADR.
 
 | # | Decision |
 | --- | --- |
-| O1 | The release zip is Free-only source (core source plus the Free `dist/`), attached to the private release only. The assets job never checks out `pro/` and asserts `--expect-pro absent`. |
-| O2 | The 14-day trial is unchanged in Free builds. The UI says Pro features are not included in this build. |
+| O1 | The release zip is core-only source (core source plus the core-only `dist/`), attached to the private release only. The assets job never checks out `pro/` and asserts `--expect-pro absent`. |
+| O2 | (Superseded by ADR 0002: there is no trial.) A build without the module says the features are not included in this build, never an upgrade. |
 | O3 | The public export excludes `.claude/`, `.github/workflows/release.yml`, `desktop-windows.yml`, `dev-build.yml` and `release-please.yml`, `scripts/runner/`, release runbooks (`docs/release-runbook-*.md`, `docs/SELF_HOSTED_RUNNER.md`) and `config/msstore.json`, in addition to `pro/` and `devtools/`, which are always excluded. |
 | O4 | The public repo name is the owner's call. Recommended default in [PUBLISHING_CORE.md](PUBLISHING_CORE.md): rename the private repo to `ChristianMunoz31/burrow-dev`, create the public `ChristianMunoz31/burrow`, and keep `burrow-pro` private for the Pro module. CLA: CLA Assistant Lite GitHub Action, signatures in a `cla-signatures` branch. |
 | O5 | [EULA.md](EULA.md) is the draft end-user license notice for official builds that combine the AGPL core with the proprietary Pro module. Draft, needs legal review. |
-| O6 | Local stable builds without `pro/` are allowed as Free builds (`BURROW_PRO=off`) and are never publishable. |
+| O6 | Local stable builds without `pro/` are allowed as core-only builds (`BURROW_PRO=off`) and are never publishable. |
 | O7 | Docker images built with `pro/` are internal only and are never published to any registry. |
 
 ## 12. Related documents

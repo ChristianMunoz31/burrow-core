@@ -21,12 +21,8 @@ vi.mock('../../../services/stateService', () => ({
 vi.mock('../../../services/aiSettingsService', () => ({
   aiSettingsService: { setup: vi.fn(), pull: vi.fn() },
 }));
-vi.mock('../../../services/licenseService', () => ({
-  licenseService: { get: vi.fn(), activate: vi.fn(), deactivate: vi.fn(), remove: vi.fn(), dismissTrialNotice: vi.fn() },
-}));
 import { profileService } from '../../../services/profileService';
 import { aiSettingsService } from '../../../services/aiSettingsService';
-import { licenseService } from '../../../services/licenseService';
 import { __resetPullStoreForTests } from '../../../hooks/ollamaPullStore';
 import { allowSlowSuite } from '../../../test-utils/slowSuite';
 
@@ -57,7 +53,7 @@ afterEach(() => {
 });
 
 describe('first-run onboarding has no licensing content', () => {
-  it('renders no licensing copy on any step and never touches the license API', async () => {
+  it('renders no licensing copy on any step', async () => {
     const user = userEvent.setup();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
@@ -73,7 +69,6 @@ describe('first-run onboarding has no licensing content', () => {
     await user.click(screen.getByRole('button', { name: 'Skip for now' }));
     const budget = await screen.findByRole('dialog', { name: 'Starter budget' });
     expect(budget.textContent).not.toMatch(LICENSING_WORDS);
-    for (const fn of Object.values(licenseService)) expect(fn).not.toHaveBeenCalled();
   });
 
   it('the onboarding source files do not mention licensing', () => {

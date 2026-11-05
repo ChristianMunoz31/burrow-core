@@ -112,32 +112,15 @@ describe('startup network silence', () => {
     expect(fs.existsSync(path.join(dataDir, 'burrow.db'))).toBe(true);
   });
 
-  it('with a stored license activation and BURROW_NETWORK_OPTIN=license, startup and GET /api/license make no license call', async () => {
-    // The first boot created secrets.key in the data dir. Sign a file copy of an activation with it, as a
-    // previous session would have left behind (the database copy is repaired from it at startup).
+  it('with every network feature on and legacy license files in the data folder, startup makes no outbound call and /api/license does not exist', async () => {
+    // Older versions left license files behind. Nothing reads them, and no store is ever contacted.
     const { loadOrCreateKeyFile } = await import('../secrets/keyFile.js');
-    const { createActivationStore, keyHashOf, deriveKeyHashKey } = await import('../license/activationStore.js');
-    const loaded = loadOrCreateKeyFile({ dir: dataDir });
-    expect(loaded.ok).toBe(true);
-    const store = createActivationStore({ dataDir, getDb: () => null, loadKey: () => loaded });
-    const record = store.save({
-      store: 'lemonsqueezy',
-      productId: '67890',
-      variantId: '1001',
-      edition: 'standard',
-      purchaseDate: '2026-09-30T14:02:11Z',
-      updatesUntil: '2027-09-30T14:02:11Z',
-      expiresAt: null,
-      activatedAt: '2026-10-05T12:00:00Z',
-      keyHash: keyHashOf(deriveKeyHashKey(loaded.key), 'lemonsqueezy', '00000000-1111-2222-3333-444444444444'),
-      keyLast4: '4444',
-      email: 'buyer@example.com',
-      instanceId: 'a1b2c3d4-0000-1111-2222-333344445555',
-      test: false,
-    });
-    expect(record).not.toBeNull();
+    expect(loadOrCreateKeyFile({ dir: dataDir }).ok).toBe(true);
+    for (const name of ['license-activation.json', 'license-trial.json', 'license-clock.json']) {
+      fs.writeFileSync(path.join(dataDir, name), JSON.stringify({ legacy: true }));
+    }
 
-    process.env.BURROW_NETWORK_OPTIN = 'license';
+    process.env.BURROW_NETWORK_OPTIN = 'weather,oura,sheets,cloudAi,aiLan,updates';
     fetchStub.mockClear();
     connectSpy.mockClear();
     const { startServer } = await import('../../server.js');
@@ -145,10 +128,8 @@ describe('startup network silence', () => {
     try {
       expect(server.listening).toBe(true);
       const res = await request(url).get('/api/license');
-      expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ edition: 'standard', license: { store: 'lemonsqueezy', keyLast4: '4444' } });
-      expect(res.body.state).not.toBe('invalid');
-      expect(connectSpy).toHaveBeenCalled();
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: 'not_found' });
     } finally {
       await stop();
       delete process.env.BURROW_NETWORK_OPTIN;

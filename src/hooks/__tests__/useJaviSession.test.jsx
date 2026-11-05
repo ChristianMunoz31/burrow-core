@@ -174,202 +174,38 @@ describe('useJaviSession', () => {
   });
 });
 
-describe('useJaviSession conversation option', () => {
-  const abortable = () =>
-    mockFetch.mockImplementationOnce(
-      (_url, { signal }) =>
-        new Promise((_resolve, reject) => {
-          signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
-        }),
-    );
-  const proHook = () =>
-    renderHook(({ conversation }) => useJaviSession({ readPageContext, conversation }), {
-      initialProps: { conversation: true },
-    });
+describe('useJaviSession follow-ups work in every build', () => {
+  const hook = () => renderHook(() => useJaviSession({ readPageContext }));
 
-  describe('conversation: false (Free)', () => {
-    const freeHook = () => renderHook(() => useJaviSession({ readPageContext, conversation: false }));
-
-    it('sendMessage makes no request and leaves the thread untouched', async () => {
-      const { result } = freeHook();
-      await act(async () => result.current.sendMessage('todos', 'what is due?'));
-      expect(mockFetch).not.toHaveBeenCalled();
-      const t = result.current.threadFor('todos');
-      expect(t.messages).toHaveLength(0);
-      expect(t.status).toBe('idle');
-      expect(t.error).toBeNull();
-    });
-
-    it('requestAdvice still posts a single-shot request with no messages', async () => {
-      mockFetch.mockResolvedValueOnce(ok('One insight'));
-      const { result } = freeHook();
-      await act(async () => result.current.requestAdvice('todos'));
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(bodyOf(mockFetch.mock.calls[0]).messages).toEqual([]);
-    });
-
-    it('calling requestAdvice twice replaces the card instead of appending', async () => {
-      mockFetch.mockResolvedValueOnce(ok('first insight')).mockResolvedValueOnce(ok('second insight'));
-      const { result } = freeHook();
-      await act(async () => result.current.requestAdvice('todos'));
-      expect(result.current.threadFor('todos').messages).toHaveLength(1);
-      await act(async () => result.current.requestAdvice('todos'));
-      const t = result.current.threadFor('todos');
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(bodyOf(mockFetch.mock.calls[1]).messages).toEqual([]);
-      expect(t.messages).toHaveLength(1);
-      expect(t.messages[0]).toMatchObject({ role: 'assistant', content: 'second insight', auto: true });
-    });
-
-    it('retry of a failed auto-advice (no earlier messages) still resends it', async () => {
-      mockFetch.mockResolvedValueOnce(fail(500, 'boom')).mockResolvedValueOnce(ok('recovered'));
-      const { result } = freeHook();
-      await act(async () => result.current.requestAdvice('todos'));
-      expect(result.current.threadFor('todos').status).toBe('error');
-      await act(async () => result.current.retry('todos'));
-      expect(bodyOf(mockFetch.mock.calls[1]).messages).toEqual([]);
-      expect(result.current.threadFor('todos').messages[0]).toMatchObject({ content: 'recovered' });
-    });
-
-    it('retry makes no request once a failed follow-up is collapsed away (history-bearing last request)', async () => {
-      mockFetch.mockResolvedValueOnce(ok('card')).mockResolvedValueOnce(fail(500, 'boom'));
-      const { result, rerender } = proHook();
-      await act(async () => result.current.requestAdvice('todos'));
-      await act(async () => result.current.sendMessage('todos', 'follow up'));
-      expect(result.current.threadFor('todos').status).toBe('error');
-      expect(result.current.threadFor('todos').lastRequestMessages.length).toBeGreaterThan(0);
-      rerender({ conversation: false });
-      mockFetch.mockClear();
-      await act(async () => result.current.retry('todos'));
-      expect(mockFetch).not.toHaveBeenCalled();
-      const t = result.current.threadFor('todos');
-      expect(t.status).toBe('idle');
-      expect(t.error).toBeNull();
-    });
+  it('has no conversation option: sendMessage sends the follow-up after the card', async () => {
+    mockFetch.mockResolvedValueOnce(ok('card')).mockResolvedValueOnce(ok('answer'));
+    const { result } = hook();
+    await act(async () => result.current.requestAdvice('todos'));
+    await act(async () => result.current.sendMessage('todos', 'what is due?'));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(bodyOf(mockFetch.mock.calls.at(-1)).messages.at(-1)).toEqual({ role: 'user', content: 'what is due?' });
+    expect(result.current.threadFor('todos').messages).toHaveLength(3);
   });
 
-  describe('rerender from true to false', () => {
-    it('collapses the thread to the last automatic card', async () => {
-      mockFetch
-        .mockResolvedValueOnce(ok('the card'))
-        .mockResolvedValueOnce(ok('reply 1'))
-        .mockResolvedValueOnce(ok('reply 2'));
-      const { result, rerender } = proHook();
-      await act(async () => result.current.requestAdvice('todos'));
-      await act(async () => result.current.sendMessage('todos', 'q1'));
-      await act(async () => result.current.sendMessage('todos', 'q2'));
-      expect(result.current.threadFor('todos').messages).toHaveLength(5);
-
-      rerender({ conversation: false });
-      const t = result.current.threadFor('todos');
-      expect(t.messages).toHaveLength(1);
-      expect(t.messages[0]).toMatchObject({ role: 'assistant', content: 'the card', auto: true });
-      expect(t.status).toBe('idle');
-      expect(t.error).toBeNull();
-    });
-
-    it('collapses every page, and a page with no automatic card ends up empty', async () => {
-      mockFetch.mockResolvedValueOnce(ok('todos card')).mockResolvedValueOnce(ok('habits reply'));
-      const { result, rerender } = proHook();
-      await act(async () => result.current.requestAdvice('todos'));
-      await act(async () => result.current.sendMessage('habits', 'only a question'));
-      rerender({ conversation: false });
-      expect(result.current.threadFor('todos').messages.map((m) => m.content)).toEqual(['todos card']);
-      expect(result.current.threadFor('habits').messages).toHaveLength(0);
-    });
-
-    it('leaves the thread alone when the option does not change', async () => {
-      mockFetch.mockResolvedValueOnce(ok('card')).mockResolvedValueOnce(ok('reply'));
-      const { result, rerender } = proHook();
-      await act(async () => result.current.requestAdvice('todos'));
-      await act(async () => result.current.sendMessage('todos', 'q'));
-      rerender({ conversation: true });
-      expect(result.current.threadFor('todos').messages).toHaveLength(3);
-    });
-
-    it('aborts an in-flight follow-up without showing an error', async () => {
-      mockFetch.mockResolvedValueOnce(ok('the card'));
-      const { result, rerender } = proHook();
-      await act(async () => result.current.requestAdvice('todos'));
-      abortable();
-      act(() => {
-        result.current.sendMessage('todos', 'slow question');
-      });
-      expect(result.current.threadFor('todos').status).toBe('loading');
-      const { signal } = mockFetch.mock.calls.at(-1)[1];
-
-      rerender({ conversation: false });
-      expect(signal.aborted).toBe(true);
-      await act(async () => {});
-      const t = result.current.threadFor('todos');
-      expect(t.status).toBe('idle');
-      expect(t.error).toBeNull();
-      expect(t.partial).toBe('');
-      expect(t.messages).toHaveLength(1);
-      expect(t.messages[0]).toMatchObject({ role: 'assistant', content: 'the card', auto: true });
-    });
-
-    it('keeps an in-flight automatic request running and lands its card', async () => {
-      const d = deferred();
-      mockFetch.mockReturnValueOnce(d.promise);
-      const { result, rerender } = proHook();
-      act(() => {
-        result.current.requestAdvice('todos');
-      });
-      const { signal } = mockFetch.mock.calls[0][1];
-      rerender({ conversation: false });
-      expect(signal.aborted).toBe(false);
-      expect(result.current.threadFor('todos').status).toBe('loading');
-
-      await act(async () => d.resolve(ok('late card')));
-      const t = result.current.threadFor('todos');
-      expect(t.status).toBe('idle');
-      expect(t.error).toBeNull();
-      expect(t.messages).toHaveLength(1);
-      expect(t.messages[0]).toMatchObject({ content: 'late card', auto: true });
-    });
-
-    it('frees the aborted page so it can request fresh advice', async () => {
-      mockFetch.mockResolvedValueOnce(ok('the card'));
-      const { result, rerender } = proHook();
-      await act(async () => result.current.requestAdvice('todos'));
-      abortable();
-      act(() => {
-        result.current.sendMessage('todos', 'slow');
-      });
-      rerender({ conversation: false });
-      await act(async () => {});
-      mockFetch.mockResolvedValueOnce(ok('refreshed'));
-      await act(async () => result.current.requestAdvice('todos'));
-      expect(bodyOf(mockFetch.mock.calls.at(-1)).messages).toEqual([]);
-      expect(result.current.threadFor('todos').messages.map((m) => m.content)).toEqual(['refreshed']);
-    });
+  it('retry resends a failed follow-up', async () => {
+    mockFetch.mockResolvedValueOnce(ok('card')).mockResolvedValueOnce(fail(500, 'boom')).mockResolvedValueOnce(ok('answer'));
+    const { result } = hook();
+    await act(async () => result.current.requestAdvice('todos'));
+    await act(async () => result.current.sendMessage('todos', 'follow up'));
+    expect(result.current.threadFor('todos').status).toBe('error');
+    await act(async () => result.current.retry('todos'));
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(bodyOf(mockFetch.mock.calls.at(-1)).messages.at(-1)).toEqual({ role: 'user', content: 'follow up' });
+    expect(result.current.threadFor('todos').status).toBe('idle');
   });
 
-  describe('rerender from false to true (Free to Pro)', () => {
-    it('re-enables follow-ups without losing the card', async () => {
-      mockFetch.mockResolvedValueOnce(ok('the card')).mockResolvedValueOnce(ok('reply'));
-      const { result, rerender } = renderHook(
-        ({ conversation }) => useJaviSession({ readPageContext, conversation }),
-        { initialProps: { conversation: false } },
-      );
-      await act(async () => result.current.requestAdvice('todos'));
-      rerender({ conversation: true });
-      await act(async () => result.current.sendMessage('todos', 'now allowed'));
-      expect(bodyOf(mockFetch.mock.calls.at(-1)).messages.at(-1)).toEqual({ role: 'user', content: 'now allowed' });
-      expect(result.current.threadFor('todos').messages).toHaveLength(3);
-    });
-  });
-
-  describe('pro_required failure', () => {
-    it('keeps the pro_required code on the thread error', async () => {
-      mockFetch.mockResolvedValueOnce(fail(403, 'pro_required'));
-      const { result } = proHook();
-      await act(async () => result.current.sendMessage('todos', 'follow up'));
-      const t = result.current.threadFor('todos');
-      expect(t.status).toBe('error');
-      expect(t.error).toMatchObject({ code: 'pro_required' });
-    });
+  it('keeps every turn on the thread and never collapses it to one card', async () => {
+    mockFetch.mockResolvedValueOnce(ok('card')).mockResolvedValueOnce(ok('answer'));
+    const { result, rerender } = hook();
+    await act(async () => result.current.requestAdvice('todos'));
+    await act(async () => result.current.sendMessage('todos', 'one'));
+    rerender();
+    expect(result.current.threadFor('todos').messages).toHaveLength(3);
   });
 });
 

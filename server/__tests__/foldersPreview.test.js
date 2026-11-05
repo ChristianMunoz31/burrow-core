@@ -3,7 +3,6 @@
 // text cap, kinds, PDF page breaks, the document cache, the single document parse, abort on disconnect, the limiter and
 // JobView.progress.currentFileId. Synthetic temp folders, fake Ollama.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import request from 'supertest';
 
 vi.mock('../../loadEnv.js', () => ({}));
@@ -21,7 +20,6 @@ import { cutText, pageBreakOffsets } from '../folders/preview.js';
 import { clearPreviewCache, previewCacheStats, previewKey, setPreviewDoc } from '../folders/previewCache.js';
 import { allFileRows, getFolder, updateFolder } from '../folders/store.js';
 import { __setBusyDelaysForTests } from '../folders/summarize.js';
-import { FREE, resetPro, setEntitlements } from './helpers/pro.js';
 import { installFakeOllama, textReply } from './helpers/fakeOllama.js';
 import { COPY, errorBody, fingerprint, makeTmp, neutralPathOptions, rmTree, tryDirLink, tryFileLink, writeTree } from './helpers/foldersEnv.js';
 import { closeTestDb, createTestDb, resetDb } from './helpers/testDb.js';
@@ -97,7 +95,6 @@ afterAll(() => {
 beforeEach(() => {
   resetDb(db);
   clearPreviewCache();
-  setEntitlements(FREE);
   __setPathOptionsForTests(neutralPathOptions(root));
   __resetAiForTests();
   fetch.mockReset();
@@ -108,7 +105,6 @@ beforeEach(() => {
 afterEach(async () => {
   cancelAllFolderJobs('shutdown');
   await drainFolderJobs({ timeoutMs: 2000 });
-  resetPro();
   vi.restoreAllMocks();
 });
 
@@ -397,7 +393,6 @@ describe('limiter', () => {
 
 describe('JobView.progress.currentFileId', () => {
   it('names the file being summarized and is null otherwise', async () => {
-    setEntitlements(FREE);
     let release = () => {};
     const gate = new Promise((resolve) => {
       release = resolve;

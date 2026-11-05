@@ -330,8 +330,7 @@ export function assertOutsideRepo(dir, root) {
 }
 
 /**
- * The three Gumroad products, from config/store.json (Pro and the hidden student/nonprofit product) and
- * config/gumroad-sync.json (the free download). A product with an empty id is left out.
+ * The three Gumroad products, from config/gumroad-sync.json. A product with an empty id is left out.
  * @param {string} root
  * @returns {{ key: string, label: string, id: string }[]}
  */
@@ -343,11 +342,10 @@ export function loadProducts(root) {
       throw new Error(`Could not read ${rel}. It must exist and be valid JSON.`);
     }
   };
-  const store = readJson('config/store.json');
   const sync = readJson('config/gumroad-sync.json');
   const all = [
-    { key: 'pro', label: 'Burrow Pro', id: store?.gumroad?.proProductId },
-    { key: 'free-license', label: 'Burrow student and nonprofit (hidden)', id: store?.gumroad?.freeLicenseProductId },
+    { key: 'pro', label: 'Burrow Pro', id: sync?.proProductId },
+    { key: 'free-license', label: 'Burrow student and nonprofit (hidden)', id: sync?.freeLicenseProductId },
     { key: 'download', label: 'Burrow free download', id: sync?.downloadProductId },
   ];
   return all.filter((p) => typeof p.id === 'string' && p.id.trim() !== '').map((p) => ({ ...p, id: p.id.trim() }));
@@ -404,7 +402,7 @@ export async function runSync(opts, deps = {}) {
   const { text, source } = buildWhatsNew({ tag, root, notesFrom: opts.notesFrom, warn: (m) => log(`Warning: ${m}`) });
   const paragraph = renderParagraph(version, text);
   const products = loadProducts(root);
-  if (products.length === 0) throw new Error('No Gumroad product ids are set in config/store.json or config/gumroad-sync.json.');
+  if (products.length === 0) throw new Error('No Gumroad product ids are set in config/gumroad-sync.json.');
 
   log(`Gumroad sync for ${tag} (${opts.publish ? 'PUBLISH' : 'DRY RUN, nothing is written'})`);
   log(`What's new from ${source}:`);

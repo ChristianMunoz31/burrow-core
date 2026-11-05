@@ -28,7 +28,6 @@ import {
 } from './registry.js';
 import { getAiSettings, updateAiSettings, validateEndpointUrl, isValidModelName } from './settings.js';
 import { classifyLLMError } from './llmErrors.js';
-import { ProRequiredError } from '../pro.js';
 
 export { AI_REASONS, AiUnavailableError, AiBusyError, MSG_AI_OFF, MSG_NO_EMBED_MODEL, MSG_WARMING_STATUS, isAiEnabled, sendAiError, aiErrorBody };
 export { getAiClient, getEmbedClient, EMBED_MODEL, describeAi, getAiStatus, listInstalledModels, invalidateAiHealth, forgetAiHealth, isAiQueueFull, __resetAiForTests };
@@ -49,16 +48,6 @@ export { openSse } from './sse.js';
  * @returns {{ code: string, message: string, retryMs: number | null, httpStatus: number, reason?: string, feature?: string }}
  */
 export function classifyAiError(err) {
-  if (err instanceof ProRequiredError) {
-    return {
-      code: err.code,
-      feature: err.feature,
-      ...(err.reason ? { reason: err.reason } : {}),
-      message: err.publicMessage,
-      retryMs: null,
-      httpStatus: err.httpStatus,
-    };
-  }
   if (err instanceof AiUnavailableError) {
     return { code: err.code, reason: err.reason, message: err.publicMessage, retryMs: null, httpStatus: err.httpStatus };
   }

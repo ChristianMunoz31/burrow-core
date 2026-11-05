@@ -2,8 +2,7 @@
 // and the stored-setting reader, and each character reaches the advisor (both variants), Javi and briefing prompts.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Pro is on by default here (characters other than the butler are a Pro perk); the Free cases switch it off.
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
+// A character whose text is not registered (no module, or an unknown id) falls back to the butler.
 
 const h = vi.hoisted(() => ({ mode: 'real' }));
 vi.mock('../dataAccess.js', async (importOriginal) => {
@@ -25,7 +24,6 @@ import { BUTLER_CHARACTER, CHARACTER_IDS, CHARACTER_STATE_KEY, DEFAULT_CHARACTER
 import { adviceCacheKey } from '../javi/adviceCache.js';
 import { advisorSystemPrompt, buildAdvisorMessages } from '../javi/advisorPrompt.js';
 import { closeTestDb, createTestDb } from './helpers/testDb.js';
-import { PRO, resetPro, setEntitlements } from './helpers/pro.js';
 import { BUTLER_ADVISOR_SMALL, BUTLER_ADVISOR_STANDARD, BUTLER_BRIEFING, BUTLER_JARVIS } from './fixtures/javiButlerGolden.js';
 
 () => ''
@@ -105,13 +103,11 @@ describe('getCharacter', () => {
   let db;
   beforeEach(() => {
     h.mode = 'real';
-    resetPro();
     db = createTestDb();
   });
   afterEach(() => {
     vi.useRealTimers();
     h.mode = 'real';
-    resetPro();
     closeTestDb(db);
   });
 
@@ -129,8 +125,7 @@ describe('getCharacter', () => {
     expect(await getCharacter()).toBe('butler');
   });
 
-  it.each(['valet', 'concierge', 'majordomo'])('a saved %s reads as the butler when no Pro module registered its text, even with Pro on', async (id) => {
-    setEntitlements(PRO);
+  it.each(['valet', 'concierge', 'majordomo'])('a saved %s reads as the butler when no module registered its text', async (id) => {
     await setState('javi:character', id);
     expect(await getCharacter()).toBe('butler');
   });

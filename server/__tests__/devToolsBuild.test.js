@@ -1,11 +1,10 @@
 // ci:always-run
 // The developer tools must not exist in the core or in a stable build. This file proves it at the source level
 // (marker holders, import boundaries between core and devtools/) and at the bundle level (real esbuild bundles of
-// server.js and server/license/index.js with the same defines, plugin, minify and banner the sidecar bundler uses):
-// no marker text, no devtools source, the license hook refuses to install, a stored override row and an env pin are
-// ignored. It reads the source tree, so it carries the always-run marker above.
+// server.js with the same defines, plugin, minify and banner the sidecar bundler uses): no marker text, no route
+// path and no devtools source in a stable or Store bundle. It reads the source tree, so it carries the always-run
+// marker above.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -23,48 +22,21 @@ import { BUNDLE_BANNER, buildBackupWorkerSource, bundleDefine, channelBanner, da
 import { HIDDEN_APP_STATE_KEYS } from '../dataBrowser/redact.js';
 import { PROTECTED_APP_STATE_KEYS } from '../import/importExport.js';
 import { hasPrivateFile } from './helpers/privateFiles.js';
-import { closeTestDb, createTestDb } from './helpers/testDb.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(import.meta.url);
 const DISPLAY = '0.2.0-dev.20261005.abc1234';
-const T0 = Date.parse('2026-10-05T12:00:00Z');
-const BUILD_INFO = { buildDate: T0, buildDateIso: '2026-10-05T12:00:00Z', source: 'git', version: '0.1.0' };
-const EXTENSION_NAME = 'license-tier-switcher';
+const EXTENSION_NAME = 'developer-tools';
 // devtools/ is private-only (not in the public core export). The tests that need its code are skipped without it;
 // the stable-bundle, Store-bundle and module-boundary guards still run in the core, where devtools/ must not exist.
-const HAS_DEVTOOLS = hasPrivateFile('devtools/server/static.js') && hasPrivateFile('devtools/server/license/devOverride.js');
-const DEV_OVERRIDE = path.join(ROOT, 'devtools', 'server', 'license', 'devOverride.js');
-const loadDevOverride = () => import(/* @vite-ignore */ pathToFileURL(DEV_OVERRIDE).href);
+const HAS_DEVTOOLS = hasPrivateFile('devtools/server/static.js') && hasPrivateFile('devtools/server/devStatusRoute.js');
+const DEVTOOLS_SERVER_INDEX = path.join(ROOT, 'devtools', 'server', 'index.js');
 
 let tmp;
-let db;
-const stable = {};
-const dev = {};
-const store = {};
 const serverText = {};
 
 const toPosix = (file) => file.split(path.sep).join('/');
 const rel = (file) => toPosix(path.relative(ROOT, file));
-
-async function bundleLicense(name, channel, defineOpts = {}) {
-  const file = path.join(tmp, `${name}.cjs`);
-  await build({
-    entryPoints: [path.join(ROOT, 'server', 'license', 'index.js')],
-    outfile: file,
-    bundle: true,
-    platform: 'node',
-    format: 'cjs',
-    target: 'node24',
-    minify: true,
-    legalComments: 'none',
-    logLevel: 'silent',
-    define: bundleDefine(channel === 'dev' ? DISPLAY : '0.1.0', { channel, ...defineOpts }),
-    plugins: [devToolsPlugin(channel), proPlugin({ exists: () => false })],
-    banner: { js: channelBanner(channel) + proBanner(false) + distributionBanner(defineOpts.distribution ?? 'direct') + dataLocationBanner(defineOpts.dataLocation ?? 'appdata') + BUNDLE_BANNER },
-  });
-  return { file, text: fs.readFileSync(file, 'utf8'), mod: require(file) };
-}
 
 /** The whole server.js bundle as the sidecar builds it (text only; nothing is run). */
 async function bundleServer(channel, defineOpts = {}) {
@@ -86,62 +58,13 @@ async function bundleServer(channel, defineOpts = {}) {
   return result.outputFiles[0].text;
 }
 
-/** Starts the bundled licensing module on the shared temp DB. */
-function startBundled(mod, extra = {}) {
-  const dataDir = fs.mkdtempSync(path.join(tmp, 'data-'));
-  const key = randomBytes(32);
-  mod.initLicense({
-    dataDir,
-    env: {},
-    buildInfo: BUILD_INFO,
-    now: () => T0,
-    mono: () => 1000,
-    getDb: () => db,
-    loadKey: () => ({ ok: true, key }),
-    gatherEvidence: () => null,
-    log: () => {},
-    allowTest: false,
-    autoStartTrial: false,
-    ...extra,
-  });
-}
-
-const FAKE_HOOK = {
-  inputs: () => ({
-    activation: { kind: 'none' },
-    trial: { kind: 'none' },
-    clock: { now: T0, effective: T0, hwm: T0, rollback: false, persisted: false },
-    notices: { welcome: true, endingSoon: true, ended: true },
-    saveNotices: () => {},
-  }),
-};
-
-beforeAll(async () => {
+beforeAll(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'burrow-devtools-'));
-  db = createTestDb();
-  Object.assign(stable, await bundleLicense('stable', 'stable'));
-  if (HAS_DEVTOOLS) Object.assign(dev, await bundleLicense('dev', 'dev'));
-  Object.assign(store, await bundleLicense('store', 'stable', { distribution: 'store', dataLocation: 'userprofile' }));
-}, 60_000);
-
-afterAll(() => {
-  stable.mod?.resetLicenseForTests?.();
-  store.mod?.resetLicenseForTests?.();
-  dev.mod?.resetLicenseForTests?.();
-  if (db) closeTestDb(db);
-  if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-const storeOverride = async (preset = 'pro_founding') => {
-  const { saveStoredOverride } = await loadDevOverride();
-  return expect(
-    saveStoredOverride(
-      () => db,
-      { v: 1, preset, trialDaysLeft: null, anchorAt: Math.floor(T0 / 1000) * 1000, notices: { welcome: true, endingSoon: true, ended: true } },
-      () => T0,
-    ),
-  ).toBe(true);
-};
+afterAll(() => {
+  if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
+});
 
 const SKIP = new Set(['node_modules', 'dist', '.git', '.sidecar-build', 'src-tauri', 'coverage', '.claude', '__tests__', 'docs']);
 
@@ -163,25 +86,26 @@ const rootFiles = () => fs.readdirSync(ROOT).filter((f) => /\.(js|mjs|cjs)$/.tes
 const read = (file) => fs.readFileSync(file, 'utf8');
 
 describe('the markers', () => {
-  it.skipIf(!HAS_DEVTOOLS)('BURROW_DEV_TOOLS=on lives in the two developer-tools files and the checker, nowhere else in shipped source', () => {
+  it.skipIf(!HAS_DEVTOOLS)('BURROW_DEV_TOOLS=on lives only in devtools/ (server and UI) and the checker, nowhere else in shipped source', () => {
     expect(DEV_TOOLS_MARKER).toBe('BURROW_DEV_TOOLS=on');
     const files = [...['server', 'src', 'scripts', 'devtools'].flatMap((d) => walkFiles(path.join(ROOT, d))), ...rootFiles()];
     const holders = files.filter((f) => read(f).includes(DEV_TOOLS_MARKER)).map(rel);
-    expect(holders.sort()).toEqual(['devtools/server/license/devOverride.js', 'devtools/ui/DeveloperSection.jsx', 'scripts/checks/channelMarker.js']);
+    expect(holders).toContain('scripts/checks/channelMarker.js');
+    expect(holders).toContain('devtools/server/index.js');
+    expect(holders.filter((h) => h !== 'scripts/checks/channelMarker.js' && !h.startsWith('devtools/'))).toEqual([]);
   });
 
   it('the developer routes path is nowhere in the core: server/, src/ and server.js, comments included', () => {
-    expect(DEV_TOOLS_ROUTE_MARKER).toBe('/dev/license');
+    expect(DEV_TOOLS_ROUTE_MARKER).toBe('/dev/status');
     const files = [...['server', 'src'].flatMap((d) => walkFiles(path.join(ROOT, d), /\.(js|jsx|mjs|cjs)$/)), path.join(ROOT, 'server.js')];
     expect(files.filter((f) => read(f).includes(DEV_TOOLS_ROUTE_MARKER)).map(rel)).toEqual([]);
   });
 
-  it.skipIf(!HAS_DEVTOOLS)('the real module writes the marker in a runtime-live log line, which survives minify', async () => {
-    const real = await loadDevOverride();
+  it.skipIf(!HAS_DEVTOOLS)('the real extension writes the marker in a runtime-live log line, which survives minify', async () => {
+    const { default: ext } = await import(/* @vite-ignore */ pathToFileURL(DEVTOOLS_SERVER_INDEX).href);
     const lines = [];
-    real.logOverride((m) => lines.push(m), 'pro_founding');
-    real.logOverride((m) => lines.push(m), null);
-    expect(lines).toEqual([`license: developer override pro_founding (${DEV_TOOLS_MARKER})`, `license: developer override cleared (${DEV_TOOLS_MARKER})`]);
+    ext.install({ get() {} }, { env: {}, log: (m) => lines.push(m) });
+    expect(lines).toEqual([`developer tools on (${DEV_TOOLS_MARKER})`]);
   });
 });
 
@@ -248,46 +172,27 @@ describe('devToolsPlugin', () => {
 });
 
 describe('a stable bundle', () => {
-  it('has no marker and passes the channel check', () => {
-    expect(stable.text).not.toContain(DEV_TOOLS_MARKER);
-    expect(stable.text).not.toContain('BURROW_DEV_TOOLS');
-    expect(checkBundleText(stable.text, 'stable')).toEqual([]);
-    expect(stable.text.split('\n', 1)[0]).toBe('/*! BURROW_CHANNEL=stable */');
-    // Open core: a bundle built without the Pro module carries BURROW_PRO=off on line 2 (docs/adr/0001-open-core-split.md 3.10).
-    expect(stable.text.split('\n')[1]).toBe('/*! BURROW_PRO=off */');
-  });
-
-  it('refuses to install a license hook, even a valid one', () => {
-    expect(stable.mod.installLicenseDevHook(FAKE_HOOK)).toBeNull();
-    expect(stable.mod.installLicenseDevHook(null)).toBeNull();
-  });
-
-  it.skipIf(!HAS_DEVTOOLS)('ignores a stored override row: entitlements are the real ones', async () => {
-    await storeOverride('pro_founding');
-    startBundled(stable.mod);
-    expect(stable.mod.getEntitlements()).toEqual({ pro: false, edition: null, reasons: ['no_license'] });
-    expect(stable.mod.getLicenseStatus()).toMatchObject({ state: 'free', pro: false, proSource: null, perks: { founderBackground: false } });
-  });
-
-  it('ignores an env pin, even with a dev channel in the environment', () => {
-    startBundled(stable.mod, { env: { BURROW_DEV_TIER: 'pro_founding', BURROW_CHANNEL: 'dev', BURROW_DESKTOP: '1' } });
-    expect(stable.mod.getEntitlements().pro).toBe(false);
-  });
+  it('the whole server.js bundle (as the sidecar builds it) has no marker, route or devtools source, and passes the channel check', async () => {
+    serverText.stable = await bundleServer('stable');
+    const text = serverText.stable;
+    expect(text).not.toContain(DEV_TOOLS_MARKER);
+    expect(text).not.toContain('BURROW_DEV_TOOLS');
+    expect(text).not.toContain(DEV_TOOLS_ROUTE_MARKER);
+    expect(text).not.toContain(EXTENSION_NAME);
+    expect(checkBundleText(text, 'stable')).toEqual([]);
+    expect(text.split('\n', 1)[0]).toBe('/*! BURROW_CHANNEL=stable */');
+    // Open core: a bundle built without the private module carries BURROW_PRO=off on line 2 (docs/adr/0001-open-core-split.md 3.10).
+    expect(text.split('\n')[1]).toBe('/*! BURROW_PRO=off */');
+    // Burrow is free for everyone: the bundle has no license route and no store host.
+    expect(text).not.toContain('/api/license');
+    expect(text).not.toContain('api.gumroad.com');
+    expect(text).not.toContain('api.lemonsqueezy.com');
+  }, 60_000);
 
   it('a stable worker bundle has no marker either', async () => {
     const text = await buildBackupWorkerSource({ minify: true, channel: 'stable', version: '0.1.0' });
     expect(checkBundleText(text, 'stable')).toEqual([]);
   });
-
-  it('the whole server.js bundle (as the sidecar builds it) has no marker, route or devtools source', async () => {
-    serverText.stable = await bundleServer('stable');
-    const text = serverText.stable;
-    expect(text).not.toContain(DEV_TOOLS_MARKER);
-    expect(text).not.toContain(DEV_TOOLS_ROUTE_MARKER);
-    expect(text).not.toContain(EXTENSION_NAME);
-    expect(text).not.toContain('dev_tools_unavailable');
-    expect(checkBundleText(text, 'stable')).toEqual([]);
-  }, 60_000);
 
   it('the stable check refuses both developer markers', () => {
     expect(checkBundleText(`${channelBanner('stable')}x("${DEV_TOOLS_MARKER}")`, 'stable').join(' ')).toMatch(/developer tools/);
@@ -296,44 +201,22 @@ describe('a stable bundle', () => {
 });
 
 describe('a Microsoft Store bundle (stable channel, store distribution, userprofile data location)', () => {
-  it('is a stable bundle with the store markers and no developer tools', () => {
-    expect(store.text).toContain(STORE_DISTRIBUTION_MARKER);
-    expect(store.text).toContain(USERPROFILE_DATA_LOCATION_MARKER);
-    expect(store.text).not.toContain(DEV_TOOLS_MARKER);
-    expect(store.text).not.toContain('BURROW_DEV_TOOLS');
-    expect(checkBundleText(store.text, 'stable')).toEqual([]);
-    expect(store.text.split('\n', 1)[0]).toBe('/*! BURROW_CHANNEL=stable */');
-  });
-
-  it('refuses a hook and ignores a stored override row and an env pin', async () => {
-    expect(store.mod.installLicenseDevHook(FAKE_HOOK)).toBeNull();
-    if (HAS_DEVTOOLS) await storeOverride('pro_founding');
-    startBundled(store.mod, { env: { BURROW_DEV_TIER: 'pro_founding', BURROW_CHANNEL: 'dev' } });
-    expect(store.mod.getEntitlements().pro).toBe(false);
-  });
-
-  it('the whole server.js and worker bundles (as the sidecar builds a Store build) have no developer tools', async () => {
+  it('the whole server.js and worker bundles (as the sidecar builds a Store build) have the store markers and no developer tools', async () => {
     const workerSource = await buildBackupWorkerSource({ minify: true, channel: 'stable', version: '0.1.0', distribution: 'store', dataLocation: 'userprofile' });
     expect(checkBundleText(workerSource, 'stable')).toEqual([]);
     const text = await bundleServer('stable', { distribution: 'store', dataLocation: 'userprofile' });
     expect(text).toContain(STORE_DISTRIBUTION_MARKER);
+    expect(text).toContain(USERPROFILE_DATA_LOCATION_MARKER);
     expect(text).not.toContain(DEV_TOOLS_MARKER);
+    expect(text).not.toContain('BURROW_DEV_TOOLS');
     expect(text).not.toContain(DEV_TOOLS_ROUTE_MARKER);
     expect(text).not.toContain(EXTENSION_NAME);
     expect(checkBundleText(text, 'stable')).toEqual([]);
+    expect(text.split('\n', 1)[0]).toBe('/*! BURROW_CHANNEL=stable */');
   }, 60_000);
 });
 
 describe.skipIf(!HAS_DEVTOOLS)('a dev bundle', () => {
-  it('the license module accepts a hook and hands back its access facade', () => {
-    const access = dev.mod.installLicenseDevHook(FAKE_HOOK);
-    expect(access).not.toBeNull();
-    expect(Object.keys(access)).toEqual(expect.arrayContaining(['context', 'status', 'realStatus', 'records', 'override', 'observeClock', 'reconcileTrial', 'setRealTrialNotices', 'forgetTrial', 'reloadTrial', 'fail']));
-    startBundled(dev.mod);
-    expect(dev.mod.getLicenseStatus()).toMatchObject({ state: 'free', pro: false });
-    expect(dev.mod.installLicenseDevHook(null)).toBeNull();
-  });
-
   it('the whole server.js bundle carries the marker and the route and passes the dev check', async () => {
     serverText.dev = await bundleServer('dev');
     expect(serverText.dev).toContain(DEV_TOOLS_MARKER);
@@ -369,19 +252,9 @@ describe('module boundaries', () => {
   });
 
   it.skipIf(!HAS_DEVTOOLS)('devtools imports only the allowed core modules', () => {
-    const allowed = new Set([
-      'server/license/index.js',
-      'server/license/constants.js',
-      'server/license/trialStore.js',
-      'server/license/store.js',
-      'server/license/channelSeam.js',
-      'server/license/messages.js',
-      'server/secrets/keyFile.js',
-      'server/channel.js',
-      'server/runtime.js',
-    ]);
+    const allowed = new Set(['server/license/channelSeam.js', 'server/channel.js']);
     const files = walkFiles(path.join(ROOT, 'devtools'), /\.(js|jsx)$/);
-    expect(files.length).toBeGreaterThan(5);
+    expect(files.length).toBeGreaterThan(3);
     const violations = [];
     for (const file of files) {
       for (const m of read(file).matchAll(IMPORT_SPEC)) {
@@ -396,18 +269,18 @@ describe('module boundaries', () => {
 
   it('the client never imports the server or the developer routes', () => {
     const offenders = walkFiles(path.join(ROOT, 'src'), /\.(js|jsx)$/)
-      .filter((f) => /(?:from\s+|import\s*\(\s*)['"][^'"]*(?:\/server\/|devOverride|devLicense)/.test(read(f)))
+      .filter((f) => /(?:from\s+|import\s*\(\s*)['"][^'"]*(?:\/server\/|devStatusRoute)/.test(read(f)))
       .map(rel);
     expect(offenders).toEqual([]);
   });
 
-  it('server.js mounts the extension router after the license routes and before the /api 404, and loads extensions before listening', () => {
+  it('server.js mounts the extension router after the update routes and before the /api 404, and loads extensions before listening', () => {
     const text = read(path.join(ROOT, 'server.js'));
-    const license = text.indexOf('registerLicenseRoutes(app)');
+    const before = text.indexOf('registerAiSettingsRoutes(app)');
     const mount = text.indexOf('app.use(devExtensionRouter())');
     const notFound = text.indexOf("app.use('/api', (req, res) => res.status(404)");
-    expect(license).toBeGreaterThan(-1);
-    expect(mount).toBeGreaterThan(license);
+    expect(before).toBeGreaterThan(-1);
+    expect(mount).toBeGreaterThan(before);
     expect(notFound).toBeGreaterThan(mount);
     const load = text.indexOf('await loadDevExtensions()');
     expect(load).toBeGreaterThan(-1);
@@ -417,14 +290,6 @@ describe('module boundaries', () => {
   it('the override row is protected from import and hidden from the state API and data browser (literal key, reserved by devtools/)', () => {
     expect(PROTECTED_APP_STATE_KEYS.has('dev.licenseOverride')).toBe(true);
     expect(HIDDEN_APP_STATE_KEYS.has('dev.licenseOverride')).toBe(true);
-  });
-
-  it('the test setup clears the env pin so a developer shell cannot leak into tests', () => {
-    expect(process.env.BURROW_DEV_TIER).toBeUndefined();
-    expect(process.env.BURROW_DEV_TRIAL_DAYS).toBeUndefined();
-    const setup = read(path.join(ROOT, 'server', '__tests__', 'setup', 'dataDir.js'));
-    expect(setup).toContain("'BURROW_DEV_TIER'");
-    expect(setup).toContain("'BURROW_DEV_TRIAL_DAYS'");
   });
 
   it('the loader trio exists and only the stable stub is a null loader', () => {
@@ -437,8 +302,8 @@ describe('module boundaries', () => {
   });
 });
 
-describe('no em dashes in the shipped switcher copy', () => {
-  it.each(['devtools/server/license/devOverride.js', 'devtools/server/license/devLicense.js', 'devtools/server/devLicenseRoutes.js', 'devtools/ui/DeveloperSection.jsx', 'server/devExtensions.js'].filter(hasPrivateFile))('%s', (file) => {
+describe('no em dashes in the shipped developer tools copy', () => {
+  it.each(['devtools/server/index.js', 'devtools/server/devStatusRoute.js', 'devtools/ui/DeveloperSection.jsx', 'server/devExtensions.js'].filter(hasPrivateFile))('%s', (file) => {
     expect(read(path.join(ROOT, file))).not.toMatch(/—/);
   });
 });

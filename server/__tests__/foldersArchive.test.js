@@ -5,7 +5,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import request from 'supertest';
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 
@@ -22,7 +21,6 @@ import { getFolder, updateFolder } from '../folders/store.js';
 import { importZipBuffer } from '../import/importExport.js';
 import { installFakeOllama, textReply } from './helpers/fakeOllama.js';
 import { COPY, errorBody, makeTmp, neutralPathOptions, rmTree, writeTree } from './helpers/foldersEnv.js';
-import { resetPro } from './helpers/pro.js';
 import { SAME_ORIGIN, makeDialogApp, startDialogs, stopDialogs } from './helpers/dialogHarness.js';
 import { closeTestDb, createTestDb, resetDb } from './helpers/testDb.js';
 
@@ -135,7 +133,6 @@ afterEach(async () => {
   cancelAllFolderJobs('shutdown');
   await drainFolderJobs({ timeoutMs: 2000 });
   stopDialogs();
-  resetPro();
   vi.restoreAllMocks();
 });
 

@@ -22,7 +22,7 @@ const EXPECTED_COPY = {
 
 let clock;
 let audits;
-const ok = { counts: { tables: 17, rows: 3, secrets: 1, backups: 0 }, licenseRemoved: false, backupsDeleted: false };
+const ok = { counts: { tables: 17, rows: 3, secrets: 1, backups: 0 }, backupsDeleted: false };
 
 function build({ authEnabled = false, erase = vi.fn(async () => ok) } = {}) {
   const tokenStore = createEraseTokenStore({ now: () => clock.t, mono: () => clock.t });
@@ -73,7 +73,7 @@ describe('POST /api/data/erase/request', () => {
 });
 
 describe('POST /api/data/erase', () => {
-  it('erases with a fresh token and the exact phrase, passing only the two options, and answers no-store', async () => {
+  it('erases with a fresh token and the exact phrase, passing only deleteBackups, and answers no-store', async () => {
     const { app, erase } = build();
     const token = await getToken(app);
     const res = await post(app, '/api/data/erase', { token, phrase: 'ERASE', removeLicense: true, deleteBackups: false, extra: 'x' });
@@ -81,13 +81,13 @@ describe('POST /api/data/erase', () => {
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.body.data).toMatchObject({ erased: true, counts: { rows: 3 } });
     expect(erase).toHaveBeenCalledTimes(1);
-    expect(erase).toHaveBeenCalledWith({ removeLicense: true, deleteBackups: false });
+    expect(erase).toHaveBeenCalledWith({ deleteBackups: false });
   });
 
-  it('defaults both options to off', async () => {
+  it('defaults deleteBackups to off', async () => {
     const { app, erase } = build();
     await post(app, '/api/data/erase', { token: await getToken(app), phrase: 'ERASE' });
-    expect(erase).toHaveBeenCalledWith({ removeLicense: false, deleteBackups: false });
+    expect(erase).toHaveBeenCalledWith({ deleteBackups: false });
   });
 
   it('missing token: 400 erase_token_required, nothing erased', async () => {
@@ -162,7 +162,6 @@ describe('POST /api/data/erase', () => {
   );
 
   it.each([
-    ['a non-boolean removeLicense', { phrase: 'ERASE', removeLicense: 'yes' }],
     ['a non-boolean deleteBackups', { phrase: 'ERASE', deleteBackups: 1 }],
     ['an array body', []],
   ])('rejects %s with 400 invalid_request and erases nothing', async (_name, extra) => {

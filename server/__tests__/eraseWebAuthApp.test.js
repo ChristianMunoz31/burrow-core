@@ -2,7 +2,6 @@
 // re-entry, the CORS and origin protections, the rate limit and token expiry. Env is set before the app imports.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
-import { resetLicenseForTests } from '../license/index.js';
 import { cleanupBackupEnv } from './helpers/backupEnv.js';
 import { SAME_ORIGIN, freshDb, rowCounts, seedEverything } from './helpers/eraseEnv.js';
 
@@ -35,7 +34,6 @@ beforeEach(() => {
   freshDb();
 });
 afterEach(() => {
-  resetLicenseForTests();
   cleanupBackupEnv();
 });
 

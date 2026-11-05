@@ -140,10 +140,6 @@ async function main() {
       BURROW_PORT: String(port),
       BURROW_SCHEDULER: '0',
       BURROW_NETWORK_OPTIN: '',
-      // Store licensing test hooks (docs/LICENSING.md 4.7): passed through only when set.
-      ...Object.fromEntries(
-        ['BURROW_LICENSE_STORE_BASE_URL', 'BURROW_LICENSE_STORE_TEST'].filter((k) => process.env[k]).map((k) => [k, process.env[k]]),
-      ),
     },
   });
 

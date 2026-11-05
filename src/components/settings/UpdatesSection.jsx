@@ -47,18 +47,6 @@ const formatDateTime = (iso) => {
     : null;
 };
 
-const licenseNote = (impact, updatesUntil) => {
-  const date = formatDate(updatesUntil);
-  if (impact === 'free') return 'Updates are free. Your data and settings carry over.';
-  if (impact === 'included') return 'Your license includes this update. Pro stays on.';
-  if (impact === 'blocked') {
-    return `${
-      date ? `Your license includes updates released until ${date}.` : 'Your license includes updates up to a set date.'
-    } This version came out after ${date ? 'that' : 'it'}, so Pro would be off in it. Keep this version to keep Pro. Your data and settings stay as they are.`;
-  }
-  return "Burrow couldn't confirm that your license includes this update, so it won't download it. Close and reopen Burrow, then click Check now.";
-};
-
 /** True when the answer is the installer Burrow asked for: right version, pinned link, plain file name, SHA-256. */
 const isValidInstaller = (r, version) =>
   /^[0-9a-f]{64}$/.test(r?.sha256) &&
@@ -165,12 +153,10 @@ function ManualDownload({ version, onBusyChange }) {
 
 function AvailableUpdate({ status, recheck, onBusyChange }) {
   const notesId = useId();
-  const { latest, notes, licenseImpact, updatesUntil, canInstall, canDownload } = status;
-  const allowed = licenseImpact === 'free' || licenseImpact === 'included';
+  const { latest, notes, canInstall, canDownload } = status;
   const date = formatDate(status.publishedAt);
   const hasNotes = typeof notes === 'string' && notes.trim() !== '';
   const safeUrl = typeof status.url === 'string' && status.url.startsWith(RELEASES);
-  const warn = licenseImpact === 'blocked' || licenseImpact === 'unknown';
 
   return (
     <div className="glass-subtle space-y-3 rounded-md p-3">
@@ -193,10 +179,7 @@ function AvailableUpdate({ status, recheck, onBusyChange }) {
           </div>
         </div>
       )}
-      <p role="note" className={warn ? 'text-sm text-accent-amber' : HINT}>
-        {licenseNote(licenseImpact, updatesUntil)}
-      </p>
-      {allowed && canInstall && (
+      {canInstall && (
         <>
           <p className={HINT}>
             Before it updates, Burrow saves a backup of your data. If the backup fails, nothing is downloaded. The new version also keeps
@@ -205,13 +188,13 @@ function AvailableUpdate({ status, recheck, onBusyChange }) {
           <UpdateInstallPanel key={latest} version={latest} onRecheck={recheck} onBusyChange={onBusyChange} />
         </>
       )}
-      {allowed && !canInstall && canDownload && (
+      {!canInstall && canDownload && (
         <>
           <p className={HINT}>Burrow saves a backup of your data first. Then your browser downloads the installer.</p>
           <ManualDownload key={latest} version={latest} onBusyChange={onBusyChange} />
         </>
       )}
-      {allowed && !canInstall && !canDownload && (
+      {!canInstall && !canDownload && (
         <p className={HINT}>To update, download the new version from the releases page.</p>
       )}
       {safeUrl && (

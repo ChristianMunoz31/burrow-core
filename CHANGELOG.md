@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.0.0](https://github.com/ChristianMunoz31/burrow/compare/v1.4.0...v2.0.0) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* /api/license*, 403 pro_required and 409 update_license_window no longer exist.
+
+### Features
+
+* Burrow is free for everyone (remove trial, licenses and upgrade prompts) ([#123](https://github.com/ChristianMunoz31/burrow/issues/123)) ([172c2ef](https://github.com/ChristianMunoz31/burrow/commit/172c2ef586a465e1b65574fa4265243d8bfa0afe))
+* **core:** open-core split, AGPL core with a private Pro module ([#121](https://github.com/ChristianMunoz31/burrow/issues/121)) ([2fb33de](https://github.com/ChristianMunoz31/burrow/commit/2fb33def6ab403fc03903a09c0be0f4bb0f2220f))
+
+
+### Bug Fixes
+
+* **ci:** make the main checks green on Linux runners and Rust 1.99 ([#122](https://github.com/ChristianMunoz31/burrow/issues/122)) ([a053378](https://github.com/ChristianMunoz31/burrow/commit/a053378ecef8c1fd96d2cd1a11e89a556734c779))
+* **store:** ship the userprofile data location after the 10.6.3 capability refusal ([#114](https://github.com/ChristianMunoz31/burrow/issues/114)) ([cb39fb1](https://github.com/ChristianMunoz31/burrow/commit/cb39fb1479ab57545e98e6255e63e6faec41016d))
+
+
+### Documentation
+
+* **release:** add v1.4.0 release notes ([b9402eb](https://github.com/ChristianMunoz31/burrow/commit/b9402eb07301ee477b6088d914d1927a00add5aa))
+
 ## [1.4.0](https://github.com/ChristianMunoz31/burrow/compare/v1.3.0...v1.4.0) (2026-10-15)
 
 

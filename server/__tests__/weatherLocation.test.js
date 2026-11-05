@@ -216,8 +216,8 @@ describe('export, import and erase', () => {
     expect(row?.value).toEqual({ lat: 1.5, lon: 2.5 });
   });
 
-  it('is not one of the rows Erase all my data keeps', async () => {
-    const { KEPT_STATE_KEYS } = await import('../erase/eraseService.js');
-    expect(KEPT_STATE_KEYS).not.toContain(WEATHER_LOCATION_KEY);
+  it('is erased by Erase all my data (no app_state row is kept)', async () => {
+    const { TABLE_CLASS } = await import('../erase/eraseService.js');
+    expect(TABLE_CLASS.app_state).toBe('erased');
   });
 });

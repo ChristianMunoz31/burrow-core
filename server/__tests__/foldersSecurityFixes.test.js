@@ -3,7 +3,6 @@
 // identity check, subfolder junction swaps, the prompt fence, the add race, Pro re-checks and hidden folders.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 // Pro is on for this file unless a test switches it off.
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 
@@ -32,7 +31,6 @@ import { getFolder } from '../folders/store.js';
 import { __setBusyDelaysForTests } from '../folders/summarize.js';
 import { toFolderView } from '../folders/views.js';
 import { newWalkMeta, walkFolder } from '../folders/walk.js';
-import { resetPro } from './helpers/pro.js';
 import { installFakeOllama, textReply } from './helpers/fakeOllama.js';
 import { addFolderRow, makeTmp, rmTree, useNeutralPaths, writeTree } from './helpers/foldersEnv.js';
 import { closeTestDb, createTestDb, resetDb } from './helpers/testDb.js';
@@ -78,7 +76,6 @@ afterAll(() => {
 });
 beforeEach(async () => {
   resetDb(db);
-  resetPro();
   fetch.mockReset();
   __resetAiForTests();
   __resetNetPolicyForTests();

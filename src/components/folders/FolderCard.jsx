@@ -1,11 +1,10 @@
 import { Suspense, useId, useState } from 'react';
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 import { useFolderJob } from '../../hooks/useFolderJob';
-import { isFreeUi, useEntitlements, useRefreshEntitlements } from '../../hooks/useEntitlements';
-import { FolderAskPanel } from '../../extensions/proExtensions';
-import { isProRequiredError, userMessage } from '../../utils/apiError';
+import { FolderAskPanel, PRO_UI_INCLUDED } from '../../extensions/proExtensions';
+import { userMessage } from '../../utils/apiError';
 import AiUnavailable from '../shared/AiUnavailable';
-import ProGateNotice from '../license/ProGateNotice';
+import NotIncludedNotice from '../shared/NotIncludedNotice';
 import WithheldNotice from '../javi/WithheldNotice';
 import { BTN } from '../settings/pillStyles';
 import { formErrorClass } from '../shared/formStyles';
@@ -88,8 +87,8 @@ function Toggle({ open, controls, label, onClick, children }) {
 }
 
 /**
- * One folder: its summary, inventory, progress, file list and actions. The Pro panels (questions, report and
- * the daily re-scan) show the upgrade notice when Pro is off or not part of this build.
+ * One folder: its summary, inventory, progress, file list and actions. The panels that come from the private
+ * module (questions, report and the daily re-scan) show the not-included notice when this build lacks it.
  * @param {{ folder: object,
  *   onScan: (id: string) => Promise<unknown>, onCancel: (id: string) => Promise<unknown>,
  *   onRemove: (folder: object) => void, onUpdate: (id: string, patch: object) => Promise<unknown>,
@@ -101,8 +100,6 @@ function Toggle({ open, controls, label, onClick, children }) {
  *   shows only the confirm step, its export and Remove.
  */
 export default function FolderCard({ folder, onScan, onCancel, onRemove, onUpdate, onExport, shell }) {
-  const entitlements = useEntitlements();
-  const refreshEntitlements = useRefreshEntitlements();
   // Built from the folder's own id, so the page can focus it for /folders?folder=<id>.
   const headingId = `folder-${folder.id}`;
   const filesId = useId();
@@ -121,7 +118,6 @@ export default function FolderCard({ folder, onScan, onCancel, onRemove, onUpdat
   const toast = useToast();
   const flow = usePickFlow(shell.pick);
   const needsConfirm = folder.needsConfirm === true;
-  const askGated = isFreeUi(entitlements, 'folder_qa');
 
   // The list is the source of truth for whether a job is active; the polled job only refines an active one. A scan's
   // queued job remembered in the cache would otherwise outlive a fast scan the list already shows as done, and a
@@ -148,7 +144,7 @@ export default function FolderCard({ folder, onScan, onCancel, onRemove, onUpdat
 
   const toggleAuto = async (next) => {
     setSwitchError('');
-    if (next && isFreeUi(entitlements, 'folder_auto_rescan')) {
+    if (next && !PRO_UI_INCLUDED) {
       setSwitchGate(true);
       return;
     }
@@ -158,12 +154,7 @@ export default function FolderCard({ folder, onScan, onCancel, onRemove, onUpdat
       await onUpdate(folder.id, { autoRescan: next });
       toast({ message: next ? 'Daily re-scan on' : 'Daily re-scan off', type: 'success' });
     } catch (err) {
-      if (isProRequiredError(err)) {
-        refreshEntitlements();
-        setSwitchGate(true);
-      } else {
-        setSwitchError(userMessage(err, SAVE_ERROR));
-      }
+      setSwitchError(userMessage(err, SAVE_ERROR));
     } finally {
       setSwitchBusy(false);
     }
@@ -270,7 +261,7 @@ export default function FolderCard({ folder, onScan, onCancel, onRemove, onUpdat
           {switchError}
         </p>
       )}
-      {switchGate && <ProGateNotice capability="folder_auto_rescan" />}
+      {switchGate && <NotIncludedNotice capability="folder_auto_rescan" />}
 
       {running && (
         <FolderJobProgress
@@ -340,13 +331,13 @@ export default function FolderCard({ folder, onScan, onCancel, onRemove, onUpdat
         <>
           <div id={askId} hidden={open?.ask !== true}>
             {seen.ask &&
-              (FolderAskPanel && !askGated ? (
+              (FolderAskPanel ? (
                 <Suspense fallback={null}>
                   <FolderAskPanel folder={folder} />
                 </Suspense>
               ) : (
                 <section aria-label={`${ASK_HEADING}: ${folder.name}`}>
-                  <ProGateNotice capability="folder_qa" />
+                  <NotIncludedNotice capability="folder_qa" />
                 </section>
               ))}
           </div>

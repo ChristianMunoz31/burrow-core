@@ -3,7 +3,6 @@
 // fixed message instead of crashing. loadEnv is mocked so .env can't supply keys.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 // Pro is on for this file (the Pro gate itself is covered in proGating.test.js).
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import request from 'supertest';
 import { closeTestDb, createTestDb } from './helpers/testDb.js';
 

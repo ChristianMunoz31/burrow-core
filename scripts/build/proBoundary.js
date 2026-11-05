@@ -14,8 +14,6 @@ export const PRO_SERVER_CORE_ALLOWLIST = Object.freeze({
   'server/ai/index.js': Object.freeze({ names: '*' }),
   'server/netPolicy.js': Object.freeze({ names: Object.freeze(['NetworkOptInError', 'assertNetworkEnabled']) }),
   'server/networkCall.js': Object.freeze({ names: Object.freeze(['recordNetworkCall', 'statusFromHttp']) }),
-  'server/pro.js': Object.freeze({ names: '*' }),
-  'server/license/index.js': Object.freeze({ names: Object.freeze(['getEntitlements']) }),
   'server/auditHook.js': Object.freeze({ names: Object.freeze(['recordAudit']) }),
   'server/integrations.js': Object.freeze({ names: Object.freeze(['fetchWeather', 'fetchOura']) }),
   'server/secrets/index.js': Object.freeze({ names: Object.freeze(['peekSecret']) }),

@@ -2,7 +2,6 @@
 // folder; a touched file is re-hashed but not re-summarized; changed content re-summarizes only
 // that file; a deleted file disappears. The question index is tested in foldersIncremental.pro.test.js.
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 vi.mock('../folders/extract.js', async (importOriginal) => {

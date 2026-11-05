@@ -8,7 +8,7 @@ import { SHELL_ICON_BTN } from './shellStyles';
 // habits left, low readiness, imminent countdowns, budget signal). Clicking an
 // alert jumps to the relevant module.
 export default function NotificationBell() {
-  // Refreshing the briefing lives in the Javi card on Home (Pro), next to the briefing itself.
+  // Refreshing the briefing lives in the Javi card on Home, next to the briefing itself.
   const { alerts } = useBriefing();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();

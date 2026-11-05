@@ -1,5 +1,5 @@
 // End to end through the real routes (settings check, install, manual) with supertest. Only the outside world is
-// faked: node-fetch (GitHub), the license status, the backup, the shell handoff and the audit writer. The channel
+// faked: node-fetch (GitHub), the backup, the shell handoff and the audit writer. The channel
 // rules are driven by the same env vars the real capability checks read (BURROW_DESKTOP, BURROW_SHELL_UPDATER,
 // BURROW_CHANNEL, BURROW_DISTRIBUTION) and process.platform/arch, so a wrong default in any route shows up here.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -96,22 +96,8 @@ const useBuild = (name, { optIn = true } = {}) => {
   __resetUpdateCacheForTests();
 };
 
-const license = {
-  free: () => ({ proSource: null, license: null }),
-  trial: () => ({ proSource: 'local_trial', license: null }),
-  lapsedOrNone: () => ({ proSource: null, license: { updatesUntil: '2020-01-01T00:00:00Z' } }),
-  inside: () => ({ proSource: 'license', license: { updatesUntil: '2031-01-01T00:00:00Z' } }),
-  boundary: () => ({ proSource: 'license', license: { updatesUntil: PUBLISHED } }),
-  outside: () => ({ proSource: 'license', license: { updatesUntil: '2029-12-31T23:59:59Z' } }),
-  unknownDate: () => ({ proSource: 'license', license: { updatesUntil: 'soon' } }),
-  missingDate: () => ({ proSource: 'license', license: {} }),
-  throws: () => {
-    throw new Error('not initialised');
-  },
-};
-
 /** The three real routes on one app. Backup and handoff are fakes that count calls. */
-function build({ licenseStatus = license.free } = {}) {
+function build() {
   const spies = {
     createBackup: vi.fn(async () => ({ created: true, meta: { id: 'manual-1' } })),
     requestShellUpdate: vi.fn(() => ({ nonce: 'n' })),
@@ -119,9 +105,9 @@ function build({ licenseStatus = license.free } = {}) {
   const app = express();
   app.use(express.json());
   const pass = (_req, _res, next) => next();
-  registerSettingsRoutes(app, { licenseStatus });
-  registerUpdateInstallRoute(app, { ...spies, licenseStatus, limiter: pass });
-  registerManualDownloadRoute(app, { createBackup: spies.createBackup, licenseStatus, limiter: pass });
+  registerSettingsRoutes(app);
+  registerUpdateInstallRoute(app, { ...spies, limiter: pass });
+  registerManualDownloadRoute(app, { createBackup: spies.createBackup, limiter: pass });
   return { app, ...spies };
 }
 
@@ -161,8 +147,8 @@ describe('GET check: the per-channel matrix', () => {
       source: 'manifest',
       canInstall: true,
       canDownload: false,
-      licenseImpact: 'free',
     });
+    expect(res.body.data).not.toHaveProperty('licenseImpact');
     expect(fetched()).toEqual([MANIFEST_URL]);
     expect(audited()).toEqual([['updates', 'https://github.com', 'ok']]);
   });
@@ -393,60 +379,37 @@ describe('audit rows record failures as error', () => {
   });
 });
 
-describe('license gate matrix through the real check and both routes', () => {
-  const allowed = ['free', 'trial', 'lapsedOrNone', 'inside', 'boundary'];
-  const blocked = ['outside', 'unknownDate', 'missingDate', 'throws'];
-
+describe('no update window: any release installs (ADR 0002)', () => {
   describe.each([
     ['install', 'stableUpdater', INSTALL_PATH, 202],
     ['manual', 'stableNoUpdaterX64', MANUAL_PATH, 200],
   ])('%s', (_name, buildName, path, okStatus) => {
-    it.each(allowed)('allows %s', async (kind) => {
+    it('never answers update_license_window: a release of any date is allowed, one backup, no license lookup', async () => {
       useBuild(buildName);
-      const { app, createBackup } = build({ licenseStatus: license[kind] });
+      const { app, createBackup } = build();
       const res = await post(app, path);
       expect(res.status).toBe(okStatus);
+      expect(res.body?.code).not.toBe('update_license_window');
       expect(createBackup).toHaveBeenCalledTimes(1);
-    });
-
-    it.each(blocked)('blocks %s with 409 update_license_window, no backup, no handoff, no started row', async (kind) => {
-      useBuild(buildName);
-      const { app, createBackup, requestShellUpdate } = build({ licenseStatus: license[kind] });
-      const res = await post(app, path);
-      expect(res.status).toBe(409);
-      expect(res.body).toMatchObject({ error: 'update_license_window', code: 'update_license_window' });
-      expect(createBackup).not.toHaveBeenCalled();
-      expect(requestShellUpdate).not.toHaveBeenCalled();
-      expect(networkCall.recordNetworkCall.mock.calls.some((c) => c[3]?.result === 'started')).toBe(false);
-      // Only the check itself may have touched the network: the manual route must not even fetch the checksum.
-      expect(fetched().every((u) => u === MANIFEST_URL || u === API_URL)).toBe(true);
     });
 
     it('offers nothing (503, no backup) when the release date is unreadable', async () => {
       useBuild(buildName);
       h.routes.set(MANIFEST_URL, () => respond(200, manifest(NEW, { pub_date: 'not a date' })));
       h.routes.set(API_URL, () => respond(200, release(NEW, { published_at: 'not a date' })));
-      const { app, createBackup } = build({ licenseStatus: license.inside });
+      const { app, createBackup } = build();
       const res = await post(app, path);
       expect(res.status).toBe(503);
       expect(createBackup).not.toHaveBeenCalled();
     });
   });
 
-  it('GET check reports the same impact the routes enforce (blocked, included, free, unknown)', async () => {
+  it('GET check carries no license impact or updates-until field', async () => {
     useBuild('stableUpdater');
-    const impacts = {};
-    for (const kind of ['free', 'inside', 'outside', 'throws']) {
-      __resetUpdateCacheForTests();
-      impacts[kind] = (await check(build({ licenseStatus: license[kind] }).app)).body.data.licenseImpact;
-    }
-    expect(impacts).toEqual({ free: 'free', inside: 'included', outside: 'blocked', throws: 'unknown' });
-  });
-
-  it('manual blocks on a license whose window ended one second before the release', async () => {
-    useBuild('stableNoUpdaterX64');
-    const { app } = build({ licenseStatus: () => ({ proSource: 'license', license: { updatesUntil: '2029-12-31T23:59:59Z' } }) });
-    expect((await post(app, MANUAL_PATH)).status).toBe(409);
+    const res = await check(build().app);
+    expect(res.body.data).toMatchObject({ status: 'available' });
+    expect(res.body.data).not.toHaveProperty('licenseImpact');
+    expect(res.body.data).not.toHaveProperty('updatesUntil');
   });
 });
 

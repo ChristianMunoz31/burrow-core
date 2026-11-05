@@ -59,7 +59,6 @@ const SECTIONS = [
   ['privacy', 'Privacy & activity'],
   ['network', 'Network'],
   ['api-keys', 'Connected services'],
-  ['license', 'License'],
   ['updates', 'Updates'],
 ];
 
@@ -209,19 +208,19 @@ describe('SettingsLayout nav structure (real Settings page)', () => {
     await renderSettings();
     for (const nav of navs()) {
       const items = nav.querySelectorAll('ul > li');
-      expect(items).toHaveLength(12);
-      expect(items[10]).toHaveAttribute('aria-hidden', 'true');
+      expect(items).toHaveLength(11);
+      expect(items[9]).toHaveAttribute('aria-hidden', 'true');
     }
   });
 });
 
 describe('mobile pill bar', () => {
-  it('contains all ten section links plus Browse your data and scrolls horizontally', async () => {
+  it('contains all nine section links plus Browse your data and scrolls horizontally', async () => {
     await renderSettings();
     const [mobile] = navs();
     for (const [, label] of SECTIONS) expect(item(mobile, label)).toBeInTheDocument();
     expect(item(mobile, 'Browse your data')).toHaveAttribute('href', '/settings/data');
-    expect(within(mobile).getAllByRole('link')).toHaveLength(11);
+    expect(within(mobile).getAllByRole('link')).toHaveLength(10);
     expect(mobile.querySelector('ul')).toHaveClass('overflow-x-auto');
   });
 });

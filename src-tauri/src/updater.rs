@@ -669,7 +669,7 @@ mod tests {
         ));
         let short = STANDARD.encode(format!(
             "untrusted comment: x\n{}\n",
-            STANDARD.encode([b'E', b'd'])
+            STANDARD.encode(*b"Ed")
         ));
         assert!(!should_enable(
             Channel::Stable,

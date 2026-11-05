@@ -1,6 +1,6 @@
 // Burrow Dev isolation guarantees that cut across modules: Dev and stable data folders never coincide,
-// trial and clock records stay per data folder (and the copy does not import stable's), store test purchases
-// tell a stable bundle from a dev one, and the real server in each channel behaves as documented.
+// legacy license records stay per data folder (and the copy does not import stable's), the channel seam of a stable
+// bundle has no store hooks, and the real server in each channel behaves as documented.
 // Temp folders only.
 import crypto, { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -16,7 +16,6 @@ import { copyFromStable } from '../backup/stableCopy.js';
 import { dataFolderName, resolveDataDir, resolveStableDataDir } from '../paths.js';
 import { getDb, insertMany, openDb, select, upsert } from '../db/index.js';
 import { CLOCK_STATE_KEY, TRIAL_FILE_NAME, TRIAL_STATE_KEY } from '../license/constants.js';
-import { createTrialStore } from '../license/trialStore.js';
 import { RESTORE_CARRY_KEYS } from '../backup/restore.js';
 import { cleanupBackupEnv, dataDir, resetBackupEnv } from './helpers/backupEnv.js';
 import { childEnv } from './helpers/childEnv.js';
@@ -97,29 +96,8 @@ describe('the Dev data folder is never the stable one', () => {
   });
 });
 
-describe('trial and clock records stay per data folder', () => {
+describe('legacy trial and clock records stay per data folder', () => {
   const T0 = Math.floor(Date.UTC(2026, 9, 5) / 1000) * 1000;
-  const storeFor = (dir, db, ikm) =>
-    createTrialStore({ dataDir: dir, getDb: () => db, loadKey: () => ({ ok: true, key: ikm }), now: () => T0, log: () => {} });
-
-  it('a trial started in the Dev folder is invisible to a fresh stable folder', () => {
-    const devDir = mk('trial-dev');
-    const stableDir = mk('trial-stable');
-    const devDb = openDb({ filename: path.join(devDir, 'burrow.db') });
-    const stableDb = openDb({ filename: path.join(stableDir, 'burrow.db') });
-    try {
-      expect(storeFor(devDir, devDb, randomBytes(32)).start(T0)).toBe(true);
-      expect(fs.existsSync(path.join(devDir, TRIAL_FILE_NAME))).toBe(true);
-      // Fresh stable folder: no file, no row, so the trial is available there.
-      expect(fs.existsSync(path.join(stableDir, TRIAL_FILE_NAME))).toBe(false);
-      expect(select('app_state', { where: { key: TRIAL_STATE_KEY }, db: stableDb })).toEqual([]);
-      expect(storeFor(stableDir, stableDb, randomBytes(32)).load()).toEqual({ kind: 'none' });
-    } finally {
-      devDb.close();
-      stableDb.close();
-    }
-  });
-
   describe('through the copy', () => {
     beforeEach(() => {
       resetBackupEnv();
@@ -133,7 +111,7 @@ describe('trial and clock records stay per data folder', () => {
       return { dir, db };
     };
 
-    it('the carried keys include the license clock and trial rows', () => {
+    it('the carried keys still include the legacy license clock and trial rows', () => {
       expect(RESTORE_CARRY_KEYS).toContain(TRIAL_STATE_KEY);
       expect(RESTORE_CARRY_KEYS).toContain(CLOCK_STATE_KEY);
     });
@@ -163,7 +141,7 @@ describe('trial and clock records stay per data folder', () => {
       }
     });
 
-    it("Dev's own trial and clock rows survive, and its own trial file stays untouched", async () => {
+    it("Dev's own legacy trial and clock rows survive, and its own trial file stays untouched", async () => {
       const live = getDb();
       const ownTrial = { v: 1, startedAt: T0, endsAt: T0 + 7 * 86400000, mac: 'd'.repeat(43) };
       const ownClock = { v: 1, hwm: T0 + 9000, mac: 'c'.repeat(43) };
@@ -189,7 +167,7 @@ describe('trial and clock records stay per data folder', () => {
   });
 });
 
-describe('store test purchases tell stable from dev bundles', () => {
+describe('the channel seam in stable and dev bundles', () => {
   async function bundle(dir, name, define) {
     const file = path.join(dir, name);
     await build({
@@ -206,17 +184,17 @@ describe('store test purchases tell stable from dev bundles', () => {
     return file;
   }
 
-  it('a stable sidecar-like bundle refuses store test purchases, even with the env switch and a dev channel variable', async () => {
+  it('a stable sidecar-like bundle has no store hooks, so no environment switch can matter', async () => {
     const file = await bundle(mk('seam-stable'), 'server.cjs', bundleDefine('0.1.0'));
     const seam = createRequire(import.meta.url)(file);
-    expect(seam.allowStoreTestPurchases({ BURROW_LICENSE_STORE_TEST: '1', BURROW_CHANNEL: 'dev' })).toBe(false);
-    expect(seam.allowStoreTestPurchases({ BURROW_CHANNEL: 'dev', BURROW_DESKTOP: '1' })).toBe(false);
+    for (const removed of ['allowStoreTestPurchases', 'storeBaseUrl', 'rejectsTestRecords']) expect(seam, removed).not.toHaveProperty(removed);
+    expect(seam.devToolsCompiledIn()).toBe(false);
   }, 60_000);
 
-  it('a dev sidecar-like bundle accepts store test purchases', async () => {
+  it('a dev sidecar-like bundle keeps the developer tools compiled in', async () => {
     const file = await bundle(mk('seam-dev'), 'server.cjs', bundleDefine(DISPLAY, { channel: 'dev' }));
     const seam = createRequire(import.meta.url)(file);
-    expect(seam.allowStoreTestPurchases({ BURROW_DESKTOP: '1' })).toBe(true);
+    expect(seam.devToolsCompiledIn()).toBe(true);
   }, 60_000);
 
   it.each(CHANNELS_WITH_BUNDLE)('the %s backup worker bundle embeds no developer keys', async (channel) => {

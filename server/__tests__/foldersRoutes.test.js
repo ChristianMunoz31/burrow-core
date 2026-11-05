@@ -2,7 +2,6 @@
 // validation, the same-origin guard, no-store, the limiters, the three exports, ask with citations, the report, and
 // removing a folder without touching its files. Synthetic temp folders, fake Ollama, Pro on unless a test says otherwise.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import request from 'supertest';
 
 vi.mock('../../loadEnv.js', () => ({}));
@@ -19,8 +18,6 @@ import { __setPathOptionsForTests } from '../folders/pathSafety.js';
 import { allFileRows, getFolder, insertFolder, replaceFileChunks, updateFolder } from '../folders/store.js';
 import { __setBusyDelaysForTests } from '../folders/summarize.js';
 import { resolveDataDir } from '../paths.js';
-import { MSG_PRO_REQUIRED } from '../pro.js';
-import { FREE, resetPro, setEntitlements } from './helpers/pro.js';
 import { fakeEmbedding, hangingChat, installFakeOllama, textReply } from './helpers/fakeOllama.js';
 import { COPY, errorBody, fingerprint, makeTmp, neutralPathOptions, rmTree, tryDirLink, writeTree } from './helpers/foldersEnv.js';
 import { closeTestDb, createTestDb, resetDb } from './helpers/testDb.js';
@@ -116,7 +113,6 @@ afterEach(async () => {
   cancelAllFolderJobs('shutdown');
   await drainFolderJobs({ timeoutMs: 2000 });
   __setFolderLimitsForTests(null);
-  resetPro();
   delete process.env.BURROW_AI;
   vi.restoreAllMocks();
 });
@@ -444,18 +440,14 @@ describe('PATCH /api/folders/:id', () => {
     for (const id of [NO_FOLDER, 'not-a-uuid', '123', `${NO_FOLDER}0`, 'x'.repeat(200)]) expectError(await patch(id, { name: 'x' }), 'folder_not_found');
   });
 
-  it('turning the daily re-scan on needs Pro (403 pro_required) before anything else, but off and rename are free', async () => {
+  it('the daily re-scan can be turned on and off with no gate (the scheduler runs it only when the module provides it)', async () => {
     const f = await addFolder();
-    setEntitlements(FREE);
-    for (const id of [f.id, NO_FOLDER]) {
-      const res = await patch(id, { autoRescan: true });
-      expect(res.status).toBe(403);
-      expect(res.body).toEqual({ error: 'pro_required', feature: 'folder_auto_rescan', message: MSG_PRO_REQUIRED });
-      expect(res.headers['cache-control']).toBe('no-store');
-    }
-    expect(getFolder(f.id).auto_rescan).toBe(false);
+    const on = await patch(f.id, { autoRescan: true });
+    expect(on.status).toBe(200);
+    expect(getFolder(f.id).auto_rescan).toBe(true);
     expect((await patch(f.id, { autoRescan: false })).status).toBe(200);
-    expect((await patch(f.id, { name: 'Free rename' })).status).toBe(200);
+    expect(getFolder(f.id).auto_rescan).toBe(false);
+    expect((await patch(f.id, { name: 'Renamed' })).status).toBe(200);
   });
 });
 
@@ -824,7 +816,6 @@ describe('POST /api/folders/:id/export', () => {
 
   it('exports are free: Free users get all three', async () => {
     const f = await addFolder();
-    setEntitlements(FREE);
     for (const format of ['md', 'json', 'csv']) expect((await exportOf(f.id, { format })).status).toBe(200);
   });
 

@@ -15,7 +15,7 @@ const errorText = (err) =>
 /**
  * Download and install. The click is the consent: nothing is downloaded before it. The server saves a backup first and
  * hands the update to the Burrow app, which downloads it, checks its signature, restarts and installs. The parent
- * (UpdatesSection) shows the version, notes and license note, and keys this panel by version. `onBusyChange(true)` is
+ * (UpdatesSection) shows the version, notes, and keys this panel by version. `onBusyChange(true)` is
  * called while a backup is saving or the update is handed off, so the parent can hold Check now.
  * @param {{ version: string, onRecheck?: () => Promise<void>, onBusyChange?: (busy: boolean) => void }} props
  */

@@ -3,7 +3,6 @@
 // GET /api/folders/:id/files/:fileId/preview for documents (PDF and DOCX) end to end through the real app: PDF page breaks,
 // the document cache, the single document parse and abort on disconnect. Synthetic temp folders, fake Ollama.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import request from 'supertest';
 
 vi.mock('../../loadEnv.js', () => ({}));
@@ -22,7 +21,6 @@ import { __setPathOptionsForTests } from '../folders/pathSafety.js';
 import { clearPreviewCache, previewCacheStats } from '../folders/previewCache.js';
 import { getFolder } from '../folders/store.js';
 import { __setBusyDelaysForTests } from '../folders/summarize.js';
-import { FREE, resetPro, setEntitlements } from './helpers/pro.js';
 import { installFakeOllama, textReply } from './helpers/fakeOllama.js';
 import { COPY, errorBody, makeTmp, neutralPathOptions, rmTree, writeTree } from './helpers/foldersEnv.js';
 import { makeDocx, makePdf } from './helpers/synthDocs.js';
@@ -113,7 +111,6 @@ afterAll(() => {
 beforeEach(() => {
   resetDb(db);
   clearPreviewCache();
-  setEntitlements(FREE);
   __setPathOptionsForTests(neutralPathOptions(root));
   __resetAiForTests();
   fetch.mockReset();
@@ -126,7 +123,6 @@ afterEach(async () => {
   await drainFolderJobs({ timeoutMs: 2000 });
   __setParserWorkerFactoryForTests(null);
   __setParserTimeoutForTests(null);
-  resetPro();
   vi.restoreAllMocks();
 });
 

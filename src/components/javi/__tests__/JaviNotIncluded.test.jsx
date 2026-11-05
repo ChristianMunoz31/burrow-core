@@ -1,8 +1,7 @@
-// A refused Pro attempt must not vanish when the entitlements then flip to Free, the panel keeps
-// focus on a live Pro-to-Free switch, and only one upsell shows at a time.
+// A core-only build has no typed questions: a palette question sends nothing and the panel says the feature
+// is not included, with nothing to buy or start. Advice itself works.
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
-vi.mock('../../../hooks/useEntitlements', async () => (await import('../../../test-utils/entitlements.js')).entitlementsModule());
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
@@ -14,24 +13,7 @@ import { PageContextProvider, usePageContext } from '../../../contexts/PageConte
 import { resolveJaviPageKey } from '../../../constants/javiPages';
 import { allowSlowSuite } from '../../../test-utils/slowSuite';
 import { answerInbox } from '../../../test-utils/javiInbox.js';
-import {
-  FREE_STATE,
-  refreshEntitlementsMock,
-  resetEntitlementsState,
-  setEntitlementsState,
-} from '../../../test-utils/entitlements.js';
-
-// ProGateNotice delegates to ProTrialPrompt for an ended trial, which reads the license status.
-const license = vi.hoisted(() => ({ status: null }));
-vi.mock('../../../hooks/useLicense', () => ({ useLicense: () => ({ status: license.status }) }));
-const FREE_LICENSE = {
-  state: 'update_window_passed',
-  pro: false,
-  license: null,
-  proSource: null,
-  purchaseUrl: 'https://example.com/buy-burrow-pro',
-  trial: { state: 'ended' },
-};
+import { PRO_NOT_INCLUDED_COPY } from '../../../constants/proFeatures';
 
 const mockFetch = vi.fn();
 const jarvisFetch = vi.fn();
@@ -77,9 +59,7 @@ const view = () => (
   </MemoryRouter>
 );
 const bar = () => screen.getByRole('button', { name: 'Javi, AI helper' });
-const notice = () => document.querySelector('[data-capability="javi_conversation"]');
-const hintText = /Ask follow-up questions with Pro./;
-const proText = /This is a Burrow Pro feature/;
+const notice = () => document.querySelector('[data-reason="pro_not_included"]');
 
 beforeAll(async () => {
   await import('../JaviPanel');
@@ -90,47 +70,40 @@ beforeEach(() => {
   mockFetch.mockReset();
   jarvisFetch.mockReset();
   mockFetch.mockResolvedValue(ok('**Advice** here'));
-  license.status = FREE_LICENSE;
-  refreshEntitlementsMock.mockClear();
 });
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  resetEntitlementsState();
 });
 
 allowSlowSuite();
 
-describe('Free upsell', () => {
-  it('shows the notice without the passive hint when a palette question was blocked', async () => {
-    setEntitlementsState(FREE_STATE);
+describe('Not included in this build', () => {
+  it('shows the not-included notice when a palette question was blocked, and still gives the advice', async () => {
     render(view());
     act(() => openJavi({ prompt: 'what is due today' }));
     await screen.findByText('Advice');
     await waitFor(() => expect(notice()).toBeInTheDocument());
-    expect(screen.getByText(proText)).toBeInTheDocument();
-    expect(screen.queryByText(hintText)).not.toBeInTheDocument();
+    expect(screen.getByText(PRO_NOT_INCLUDED_COPY)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /buy/i })).not.toBeInTheDocument();
   });
 
-  it('shows the passive hint alone when nothing was blocked', async () => {
-    setEntitlementsState(FREE_STATE);
+  it('shows no notice and no hint when nothing was blocked', async () => {
     const user = userEvent.setup();
     render(view());
     await user.click(bar());
     await screen.findByText('Advice');
-    expect(screen.getByText(hintText)).toBeInTheDocument();
-    expect(screen.queryByText(proText)).not.toBeInTheDocument();
+    expect(notice()).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog').textContent).not.toMatch(/\bpro\b|buy|upgrade|licen[sc]e|trial/i);
   });
 
   it('clears the blocked-question notice when the page changes', async () => {
-    setEntitlementsState(FREE_STATE);
     const user = userEvent.setup();
     render(view());
     act(() => openJavi({ prompt: 'what is due today' }));
     await waitFor(() => expect(notice()).toBeInTheDocument());
 
     await user.click(screen.getByRole('link', { name: 'to habits' }));
-    await waitFor(() => expect(screen.queryByText(proText)).not.toBeInTheDocument());
-    expect(notice()).not.toBeInTheDocument();
+    await waitFor(() => expect(notice()).not.toBeInTheDocument());
   });
 });

@@ -2,7 +2,6 @@
 // restore), degraded AI, busy-queue retries, links, a replaced folder, and shutdown.
 // Real file-backed SQLite in the test data dir, the fake Ollama, synthetic temp folders.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 
@@ -32,8 +31,6 @@ import { cleanupBackupEnv } from './helpers/backupEnv.js';
 import { freshDb, rowCounts } from './helpers/eraseEnv.js';
 import { hangingChat, installFakeOllama, textReply } from './helpers/fakeOllama.js';
 import { addFolderRow, errorBody, makeTmp, rmTree, tryDirLink, tryFileLink, useNeutralPaths, writeTree } from './helpers/foldersEnv.js';
-import { resetPro } from './helpers/pro.js';
-import { resetLicenseForTests } from '../license/index.js';
 
 const NOW = new Date('2026-10-05T12:30:00.000Z');
 let base;
@@ -95,8 +92,6 @@ afterEach(async () => {
   __setPathOptionsForTests(null);
   setDbMaintenance(false);
   __resetLockForTests();
-  resetPro();
-  resetLicenseForTests();
   delete process.env.BURROW_AI_QUEUE_MAX;
   cleanupBackupEnv();
   vi.restoreAllMocks();

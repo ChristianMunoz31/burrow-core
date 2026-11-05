@@ -9,5 +9,5 @@ export const TONE_CLASS = {
 };
 export const BTN =
   'glass-subtle min-h-9 rounded-md px-3 py-1.5 text-sm font-semibold text-slate-slate300 transition hover:text-slate-slate100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:[outline-color:var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 sm:min-h-0';
-// BTN for an anchor or router link (shared by the trial banner and the Buy link so they cannot drift).
+// BTN for an anchor or router link (so it cannot drift from the button style).
 export const LINK_BTN = `${BTN} inline-flex items-center`;

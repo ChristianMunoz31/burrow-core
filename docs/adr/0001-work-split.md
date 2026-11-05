@@ -1,5 +1,7 @@
 # ADR 0001 work split: two teams, no shared files
 
+> **Note (2026-11-05):** the tiering parts (Free and Pro tiers, entitlement gates, trial and upsell UI) are superseded by [ADR 0002](0002-free-for-everyone.md). Burrow is free for everyone. The split mechanics stay. Kept as written history.
+
 Companion to [0001-open-core-split.md](0001-open-core-split.md) (contract, "ADR") and [0001-extraction-inventory.md](0001-extraction-inventory.md) (moves, "B"). Status: Proposed, 2026-11-04. Planned work only: no public copy may claim open source, AGPL or self-hosting until the owner created the public repo.
 
 ## 1. Ownership rules
@@ -107,10 +109,10 @@ npm run check:bundle                          # core keys within 470 / 125 / 31.
 node scripts/checks/channelMarker.js --expect stable --expect-pro present --dist-dir dist
 npm run check:pro-present                     # expect exit 0
 npm run check                                 # em dash, personal data, keys (core + pro files)
-npx vitest run server/__tests__/proExtensions.test.js server/__tests__/proExtensionsCloud.test.js server/__tests__/proBoundary.test.js server/__tests__/proBuild.test.js server/__tests__/proReleaseGuard.test.js server/__tests__/coreTreeGuard.test.js server/__tests__/aiBoundary.test.js server/__tests__/devToolsBuild.test.js server/__tests__/proFeatureRegistry.test.js pro/server/__tests__/proModuleContract.test.js
+npx vitest run server/__tests__/proExtensions.test.js server/__tests__/proExtensionsCloud.test.js server/__tests__/proBoundary.test.js server/__tests__/proBuild.test.js server/__tests__/proReleaseGuard.test.js server/__tests__/coreTreeGuard.test.js server/__tests__/aiBoundary.test.js server/__tests__/devToolsBuild.test.js pro/server/__tests__/proModuleContract.test.js
 ```
 
-`npm start` smoke (fresh trial data dir, unreachable Ollama so no model runs):
+`npm start` smoke (fresh data dir, unreachable Ollama so no model runs):
 
 ```powershell
 $env:BURROW_DATA_DIR = Join-Path $env:TEMP ("burrow-qa-" + [guid]::NewGuid().ToString('N'))
@@ -159,13 +161,13 @@ node scripts/checks/channelMarker.js --expect stable --expect-pro absent --dist-
 npm run check:pro-present; "exit $LASTEXITCODE"                   # expect exit 1
 $env:BURROW_REQUIRE_PRO = '1'; npm run build; "exit $LASTEXITCODE"; Remove-Item Env:BURROW_REQUIRE_PRO   # expect failure
 npm run check
-npx vitest run server/__tests__/proExtensions.test.js server/__tests__/proExtensionsCloud.test.js server/__tests__/proBoundary.test.js server/__tests__/proBuild.test.js server/__tests__/proReleaseGuard.test.js server/__tests__/coreTreeGuard.test.js server/__tests__/aiBoundary.test.js server/__tests__/devToolsBuild.test.js server/__tests__/proFeatureRegistry.test.js
+npx vitest run server/__tests__/proExtensions.test.js server/__tests__/proExtensionsCloud.test.js server/__tests__/proBoundary.test.js server/__tests__/proBuild.test.js server/__tests__/proReleaseGuard.test.js server/__tests__/coreTreeGuard.test.js server/__tests__/aiBoundary.test.js server/__tests__/devToolsBuild.test.js
 ```
 
-Smoke: run the same `npm start` block as 7.1 (rebuild `dist/` first, already done above). Expect `proModule` False and every one of the 6 paths `501` (trial active); `403` is also correct if the trial did not start; any other code is a failure.
+Smoke: run the same `npm start` block as 7.1 (rebuild `dist/` first, already done above). Expect `proModule` False and every one of the 6 paths answers `501 pro_not_included`; any other code is a failure.
 
 ```powershell
-npm run desktop:sidecar                                           # expect success with the Free-build warning
+npm run desktop:sidecar                                           # expect success with the "Building without the Pro module" warning
 node scripts/release/smokeSidecar.js --expect-pro absent
 npm run desktop:sidecar -- --require-pro; "exit $LASTEXITCODE"    # expect failure
 npm run release:store -- --check; "exit $LASTEXITCODE"            # expect failure at the pro check

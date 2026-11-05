@@ -1,5 +1,5 @@
 // Fails when a build artifact is not of the channel the build meant to make. A stable release must never
-// carry the dev channel, and a Burrow Dev build must be marked dev (docs/LICENSING.md 5.3; CONTRIBUTING.md
+// carry the dev channel, and a Burrow Dev build must be marked dev (CONTRIBUTING.md
 // "Dev channel"). Two kinds of target:
 //   --bundle <file>    a sidecar bundle: its first line must be `/*! BURROW_CHANNEL=<expect> */`; a stable
 //                      bundle must not contain the text `BURROW_CHANNEL=dev` or the developer tools marker anywhere
@@ -36,12 +36,11 @@ const MARKER_PREFIX = '/*! BURROW_CHANNEL='
 const DEV_TEXT = 'BURROW_CHANNEL=dev'
 export const STORE_DISTRIBUTION_MARKER = '/*! BURROW_DISTRIBUTION=store */'
 export const USERPROFILE_DATA_LOCATION_MARKER = '/*! BURROW_DATA_LOCATION=userprofile */'
-// Written by devtools/server/license/devOverride.js and devtools/ui/DeveloperSection.jsx only (the developer tier
-// switcher). A stable artifact must not contain it. The server never imports from scripts/, so the text lives in
+// Written by devtools/server/index.js and devtools/ui/DeveloperSection.jsx only (the developer tools placeholder). A stable artifact must not contain it. The server never imports from scripts/, so the text lives in
 // both places and devToolsBuild.test.js ties them together.
 export const DEV_TOOLS_MARKER = 'BURROW_DEV_TOOLS=on'
 // The developer routes' path: core server/ and src/ must not contain it (devToolsBuild.test.js), nor any stable artifact.
-export const DEV_TOOLS_ROUTE_MARKER = '/dev/license'
+export const DEV_TOOLS_ROUTE_MARKER = '/dev/status'
 const DEV_TOOLS_MARKERS = [DEV_TOOLS_MARKER, DEV_TOOLS_ROUTE_MARKER]
 const SCAN_EXTENSIONS = new Set(['.js', '.css', '.html', '.json', '.map'])
 const DEV_TOOLS_EXPECTATIONS = ['absent', 'present']

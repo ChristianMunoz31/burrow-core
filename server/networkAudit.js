@@ -22,9 +22,10 @@ const LABELS = Object.freeze({
   cloudAi: 'Cloud helper',
   aiLan: 'Helper on another computer',
   updates: 'Updates',
-  license: 'License',
   model_pull: 'Model download (through Ollama)',
 });
+// Feature ids retired from netPolicy. Their rows stay visible until the 90-day prune, as the privacy page promises.
+const RETIRED_LABELS = Object.freeze({ license: 'Activation check (older version)' });
 // The click-to-install handoff: the Burrow app (not the local server) does the download.
 const UPDATE_DOWNLOAD_LABEL = 'Update download (Burrow app)';
 
@@ -50,7 +51,8 @@ function toEntry(row) {
   let feature;
   let host;
   if (row.feature === NETWORK_CALL_FEATURE) {
-    if (meta.net_feature !== MODEL_PULL_FEATURE && !isFeatureId(meta.net_feature)) return null;
+    const known = meta.net_feature === MODEL_PULL_FEATURE || isFeatureId(meta.net_feature) || (typeof meta.net_feature === 'string' && Object.hasOwn(RETIRED_LABELS, meta.net_feature));
+    if (!known) return null;
     feature = meta.net_feature;
     host = safeHost(meta.net_host);
   } else if (row.feature === 'model_pull') {
@@ -72,7 +74,7 @@ function toEntry(row) {
   return {
     id: String(row.id),
     feature,
-    label: byApp ? UPDATE_DOWNLOAD_LABEL : (LABELS[feature] ?? feature),
+    label: byApp ? UPDATE_DOWNLOAD_LABEL : (LABELS[feature] ?? RETIRED_LABELS[feature] ?? feature),
     host,
     at: row.created_at,
     result,

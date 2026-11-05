@@ -8,7 +8,6 @@ import request from 'supertest';
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 vi.mock('../auditHook.js', () => ({ recordAudit: vi.fn(async () => {}), setAuditSink: vi.fn() }));
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 
 import fetch from 'node-fetch';
 import { MODELS, installFakeOllama, textReply } from './helpers/fakeOllama.js';
@@ -17,7 +16,6 @@ import { closeTestDb, createTestDb, resetDb } from './helpers/testDb.js';
 import { __resetAiForTests } from '../ai/index.js';
 import { clearAdviceCache, adviceCacheKey } from '../javi/adviceCache.js';
 import { AUTO_ADVICE_REQUEST, AUTO_ADVICE_REQUEST_SMALL, PROMPT_VERSION, advisorSystemPrompt, promptVersionFor } from '../javi/advisorPrompt.js';
-import { FREE, resetPro, setEntitlements } from './helpers/pro.js';
 
 const SSE = { Accept: 'text/event-stream' };
 const SMALL = advisorSystemPrompt({ variant: 'small' });
@@ -59,12 +57,10 @@ beforeEach(async () => {
   await resetCloud();
   __resetAiForTests();
   clearAdviceCache();
-  setEntitlements(FREE);
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => {
-  resetPro();
   delete process.env.BURROW_AI_CHAT_MODEL;
   vi.restoreAllMocks();
 });

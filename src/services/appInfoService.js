@@ -3,7 +3,7 @@ import { buildApiError } from '../utils/apiError';
 
 /**
  * @returns {Promise<{ version: string, channel: 'stable'|'dev', desktop: boolean, commit?: string|null, buildDate?: string|null, devTools?: boolean }>}
- *   `devTools` is true only where the developer tier switcher is available (Burrow Dev, source checkouts)
+ *   `devTools` is true only where the developer tools placeholder is available (Burrow Dev, source checkouts)
  */
 export async function getAppInfo() {
   const response = await fetch('/api/app/info', { cache: 'no-store' });

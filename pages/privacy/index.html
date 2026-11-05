@@ -28,7 +28,7 @@ footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
 <body>
 <main>
 <h1>Burrow privacy policy</h1>
-<p class="meta">Version 1.2. Effective 2026-10-11. Applies to Burrow: Private Life Organizer, the Windows app from Neural Foundry, both the Microsoft Store edition and the direct download edition.</p>
+<p class="meta">Version 1.3. Effective 2026-11-05. Applies to Burrow: Private Life Organizer, the Windows app from Neural Foundry, both the Microsoft Store edition and the direct download edition.</p>
 
 <h2>Who we are</h2>
 <p>Burrow is made by Neural Foundry, an individual developer. Contact: <a href="mailto:burrowsupport@gmail.com">burrowsupport@gmail.com</a>.</p>
@@ -85,13 +85,6 @@ footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
 <p><span class="k">When:</span> Only after you turn it on in Settings &gt; Updates or Settings &gt; Network, or click Check now, which turns it on. Then Burrow checks when you open Settings or click Check now. A desktop app that can install updates by itself asks github.com (the latest.json file). Every other stable copy asks api.github.com (the latest release): that includes the direct download desktop app until in-app install is turned on for it, and a copy you run yourself in a browser, in Docker or with npm start. Clicking Get the installer also reads SHA256SUMS.txt from github.com. Burrow Dev and the Microsoft Store edition make no update request.</p>
 <p><span class="k">What the app tells you:</span> Checks GitHub for a newer Burrow when you click Check now in Settings &gt; Updates, or when you open Settings while this is on, and shows what's new. Nothing is downloaded until you click Download and install. Then Burrow saves a backup, and the Burrow app downloads the installer from GitHub, checks its signature and restarts to install it. A copy that can't install updates by itself shows the installer's checksum from GitHub instead: when you click Get the installer, Burrow reads the checksum file (SHA256SUMS.txt) from GitHub and saves a backup, and your browser downloads the installer. Nothing about you or your data is sent; GitHub sees your IP address like any website.</p>
 </section>
-<section class="card" id="license">
-<h3>License activation (<code>license</code>)</h3>
-<p><span class="k">Connects to:</span> <code>api.gumroad.com</code>, <code>api.lemonsqueezy.com</code></p>
-<p><span class="k">What is sent:</span> Your license key, the Burrow product id and the setting increment_uses_count=true, which counts this activation (Gumroad), or your license key and the instance name Burrow, or the instance id for a move (Lemon Squeezy). Each request carries the header User-Agent: Burrow. The store also sees your IP address.</p>
-<p><span class="k">When:</span> Only when you click Activate or Move to another computer in Settings &gt; License. Burrow never re-checks a license in the background.</p>
-<p><span class="k">What the app tells you:</span> Contacts Gumroad or Lemon Squeezy only when you click Activate or Move to another computer in Settings &gt; License. Your license key goes to the store you bought from. Clicking one of those buttons turns this on.</p>
-</section>
 
 <h2>Downloading an AI model</h2>
 <p>By default, Javi (the assistant) talks only to Ollama on your own computer (<code>127.0.0.1</code>). Burrow does not install Ollama. If you click Get Ollama, your browser opens ollama.com. When you click Download model, Ollama, not Burrow, downloads the model from the Ollama library. Burrow makes no internet call for it.</p>
@@ -100,13 +93,10 @@ footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
 <p>Cloud AI is off by default. If you turn it on, Burrow sends prompts and the data Javi reads to the endpoint you chose, using your own API key, and only for the data categories you allow. Budget, todos, calendar, habits, bookmarks, countdowns and focus are on by default once cloud is enabled; health, notes, journal and the files of folders you add are off until you allow them. A few items have no data category, so those choices do not limit them: weather results that Javi looks up, and the advice Javi gives on the Settings page. They can be sent whenever cloud AI is on. You accept a consent screen first, and you pay the provider yourself. Saved API keys are stored encrypted on your computer and are not included in backups or exports.</p>
 
 <h2>Links that send nothing from Burrow</h2>
-<p>The Buy Burrow Pro button opens the seller's page in your default browser. The Report content link in Javi and the Help menu opens your default mail app with an empty message to <a href="mailto:burrowsupport@gmail.com">burrowsupport@gmail.com</a>. Burrow itself sends nothing for these. If you send the email, your mail provider and we receive what you write.</p>
+<p>The Report content link in Javi and the Help menu opens your default mail app with an empty message to <a href="mailto:burrowsupport@gmail.com">burrowsupport@gmail.com</a>. Burrow itself sends nothing for this. If you send the email, your mail provider and we receive what you write.</p>
 
 <h2>Microsoft Store</h2>
-<p>If you installed Burrow from the Microsoft Store, Microsoft may collect data about the install, purchase and updates under the <a href="https://privacy.microsoft.com/privacystatement">Microsoft privacy statement</a>. Burrow does not receive that data. The Store edition delivers updates through the Store and makes no update request itself.</p>
-
-<h2>Purchases</h2>
-<p>Burrow Pro is sold by Gumroad or Lemon Squeezy, which handle checkout, tax and refunds under their own privacy policies. They hold your purchase details, not Burrow.</p>
+<p>If you installed Burrow from the Microsoft Store, Microsoft may collect data about the install, download and updates under the <a href="https://privacy.microsoft.com/privacystatement">Microsoft privacy statement</a>. Burrow does not receive that data. The Store edition delivers updates through the Store and makes no update request itself.</p>
 
 <h2>Deleting your data</h2>
 <ul>
@@ -122,7 +112,7 @@ footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
 
 <h2>Contact</h2>
 <p>Questions: <a href="mailto:burrowsupport@gmail.com">burrowsupport@gmail.com</a>.</p>
-<footer>Generated from the Burrow network feature registry. Version 1.2.</footer>
+<footer>Generated from the Burrow network feature registry. Version 1.3.</footer>
 </main>
 </body>
 </html>

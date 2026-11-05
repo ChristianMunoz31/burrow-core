@@ -87,9 +87,8 @@ export const characterText = (value) => textFor(normalizeCharacter(value)) ?? BU
 /**
  * The saved character for prompts. `app_state.value` is a jsonb column: `useSyncedSetting` PUTs the bare id
  * and it reads back as a plain string; a JSON-quoted string is tolerated too. Never throws and never waits
- * long: any failure gives the default. Butler is free; any other character needs Pro (`javi_characters`, checked
- * through `proAccess`, so a Store license past its update window is honored per feature). Without access the
- * butler is returned, never an error. The Pro layer is imported on demand, like the data layer.
+ * long: any failure gives the default. A character whose text is not registered (a build without the private
+ * module) reads as the butler, never an error.
  *
  * @returns {Promise<string>} A known character id.
  */
@@ -114,9 +113,7 @@ export async function getCharacter() {
     if (id === DEFAULT_CHARACTER) return id;
     // A character whose text is not in this build reads as the butler.
     if (textFor(id) === null) return DEFAULT_CHARACTER;
-    // Pro perk (owner decision 2026-10-15): without access a saved Pro character quietly reads as the butler.
-    const { proAccess } = await import('../pro.js');
-    return proAccess('javi_characters').allowed ? id : DEFAULT_CHARACTER;
+    return id;
   } catch {
     return DEFAULT_CHARACTER;
   } finally {

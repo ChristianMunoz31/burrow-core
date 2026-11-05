@@ -14,7 +14,7 @@ import { FIXED_NOW, javiModelText, settleAndShoot } from '../support/visual.js';
 import { PLAIN_REPLY } from '../../scripts/lib/fakeOllamaServer.js';
 import { javi, seedCalendarChange, waitForActivePage } from '../pages/javi.js';
 
-useBurrow({ seed: true, ollama: 'fake', fixedNow: FIXED_NOW, preseed: { trialEnded: true } });
+useBurrow({ seed: true, ollama: 'fake', fixedNow: FIXED_NOW });
 
 const heading = (page, name) => page.getByRole('heading', { level: 2, name, exact: true }).first();
 

@@ -1,5 +1,7 @@
 # ADR 0001 inventory: what moves to `pro/`, what stays core, in which order
 
+> **Note (2026-11-05):** the tiering parts (Free and Pro tiers, entitlement gates, trial and upsell UI) are superseded by [ADR 0002](0002-free-for-everyone.md). Burrow is free for everyone. The extraction mechanics stay. Kept as written history.
+
 Companion to [0001-open-core-split.md](0001-open-core-split.md) (the contract) and [0001-work-split.md](0001-work-split.md) (who does what). Status: Proposed, 2026-11-04. Line numbers are those of v1.4.0 on `feat/open-core-split`; re-locate by symbol name if a line moved. Planned work only: no public copy may claim open source or AGPL until the owner created the public repo.
 
 ## B0. Rules for every move

@@ -1,6 +1,6 @@
 // Every routed page renders its heading with no console errors (seeded data, fake Ollama), and every page
 // a person navigates to is reachable from the shell: Home through the wordmark, Settings through the gear,
-// the rest through the one menu (each under its section dropdown, Calendar below the divider).
+// the rest through the one menu (each under its Financials, Health or Productivity dropdown, Calendar a plain row under Home).
 import { test, expect, useBurrow } from '../support/fixtures.js';
 import { ROUTES } from '../support/routes.js';
 import { nav } from '../pages/nav.js';

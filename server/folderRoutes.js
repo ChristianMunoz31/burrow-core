@@ -2,8 +2,8 @@
 // poll, list files, export (download or the native save dialog), and the dialog poll and cancel routes. The report and ask routes
 // are Pro: the Pro module registers them through the folders slot (server/proExtensions.js).
 // Success bodies are { data }; errors are { error: <code>, code: <code>, message } with fixed copy from
-// server/folders/constants.js (AI and Pro errors keep their existing shapes). Every response is no-store.
-// Pro-gated routes answer 403 pro_required before any work. No route reads or writes anything inside a folder:
+// server/folders/constants.js (AI errors keep their existing shapes). Every response is no-store.
+// No route reads or writes anything inside a folder:
 // scanning happens in server/folders/jobs.js, which only ever reads. Request bodies are never logged.
 // In the desktop app a folder is added only through the native folder picker (the shell opens the window and returns the
 // chosen path over an authenticated channel, server/desktop/dialogBroker.js); a pasted path is refused there
@@ -24,7 +24,6 @@ import {
 import { isShellDialogAvailable } from './desktop/shellChannel.js';
 import { slugify } from './export/markdown.js';
 import { resolveHostPolicy } from './hostGuard.js';
-import { requireProWhen } from './pro.js';
 import { proSlotRouter, setFolderRouteHelpers } from './proExtensions.js';
 import { makeRequireSameOrigin } from './sameOriginGuard.js';
 import { addFolderFromPath, confirmFolderPath } from './folders/addFolder.js';
@@ -227,7 +226,6 @@ export function registerFolderRoutes(
 
   app.patch(
     '/api/folders/:id',
-    requireProWhen('folder_auto_rescan', (req) => req.body?.autoRescan === true),
     writeLimiter,
     requireJson,
     handle((req, res) => {
@@ -415,8 +413,8 @@ export function registerFolderRoutes(
     }),
   );
 
-  // The report and ask routes belong to the Pro module (docs/adr/0001-open-core-split.md 3.4). Core mounts the gate
-  // (requirePro, the AI limiter and the JSON type check) in front of them; without the module they answer 501 pro_not_included.
+  // The report and ask routes belong to the Pro module (docs/adr/0001-open-core-split.md 3.4). Core mounts the AI limiter
+  // and the JSON type check in front of them; without the module they answer 501 pro_not_included.
   setFolderRouteHelpers({ handle, send, folderOr404, aiLimiter, requireJson, isPlainBody });
   app.use(proSlotRouter('folders'));
 

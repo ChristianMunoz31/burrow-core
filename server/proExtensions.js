@@ -1,35 +1,27 @@
 // Seam for the optional Burrow Pro module (docs/adr/0001-open-core-split.md 3.2-3.7). Pro lives outside the core, in
 // a top-level folder that only server/proExtensionsLoader.js names. Core knows only this contract: a module
 // `{ name, apiVersion, available(env), install(ctx) }` that registers everything through `ctx`, synchronously.
-// Every registration passes a core gate in public code: Pro routes are mounted here behind requirePro(feature)
-// (and requireAi when the route table says so), scheduled jobs, folder hooks and character texts are checked by
-// their core hosts. Without a module every Pro route answers requirePro(feature) and then 501 pro_not_included.
+// Every registration passes core in public code: module routes are mounted here with the route table's pre layers
+// (and requireAi when the table says so); scheduled jobs, folder hooks and character texts are checked by their core
+// hosts. There is no tier gate (ADR 0002). Without a module every module route answers 501 pro_not_included.
 import express from 'express';
 import { requireAi } from './ai/index.js';
 import { onDataReset } from './dataGeneration.js';
 import { setFolderProHooks, resetFolderProHooksForTests } from './folders/jobs.js';
 import { registerCharacterTexts, resetCharacterTextsForTests } from './javi/characters.js';
 import { proCompiledIn } from './license/channelSeam.js';
-import { requirePro, sendProNotIncluded } from './pro.js';
+import { sendProNotIncluded } from './pro.js';
 import { importProExtension } from './proExtensionsLoader.js';
 import { PRO_ROUTES, PRO_SLOTS } from './proRoutes.js';
 import { registerProScheduledJob, resetProScheduledJobsForTests } from './scheduler.js';
 
 export const PRO_API_VERSION = 1;
-/** Non-enumerable marker on every gate function this module mounts; its value is the feature id. */
-export const PRO_GATE = Symbol('burrow.proGate');
 
 const SCHEDULER_JOBS = new Set(['briefing', 'folderRescan']);
 const PRE_NAMES = new Set(['aiLimiter', 'requireJson']);
 
 /** Error code for the local log only: never a message or path. */
 const errCode = (err) => (typeof err?.code === 'string' ? err.code : 'error');
-
-/** @param {Function} fn @param {string} feature */
-const markGate = (fn, feature) => {
-  Object.defineProperty(fn, PRO_GATE, { value: feature, enumerable: false });
-  return fn;
-};
 
 // ---------------------------------------------------------------------------------------------
 // Slots: one outer router per slot (mounted by core at today's positions), holding the Pro router first and the
@@ -44,7 +36,7 @@ for (const slot of PRO_SLOTS) {
   const fallback = express.Router();
   for (const route of Object.values(PRO_ROUTES)) {
     if (route.slot !== slot) continue;
-    fallback[route.method](route.path, markGate(requirePro(route.feature), route.feature), sendProNotIncluded(route.feature));
+    fallback[route.method](route.path, sendProNotIncluded(route.feature));
   }
   outer.use(pro);
   outer.use(fallback);
@@ -138,7 +130,7 @@ function makeCtx(env, log) {
           return preLayer(name);
         });
         const ai = route.ai ? [requireAi(route.ai.purpose, route.ai.enabledOnly ? { enabledOnly: true } : undefined)] : [];
-        slots[route.slot].pro[route.method](route.path, markGate(requirePro(route.feature), route.feature), ...pre, ...validate, ...ai, ...handlers);
+        slots[route.slot].pro[route.method](route.path, ...pre, ...validate, ...ai, ...handlers);
         addedRoutes.add(id);
       }),
     }),

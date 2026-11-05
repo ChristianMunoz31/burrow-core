@@ -38,6 +38,7 @@ import { startBackupScheduler, stopBackupScheduler } from './server/backup/servi
 import { drainBackupWorker, resumeBackupWorker } from './server/backup/worker/client.js';
 import { registerTransactionImportRoutes, TRANSACTION_IMPORT_PATH } from './server/transactionImportRoutes.js';
 import { peekSecret, secretsPrimer } from './server/secrets/index.js';
+import { loadOrCreateKeyFile } from './server/secrets/keyFile.js';
 import { registerSecretsRoutes } from './server/secretsRoutes.js';
 import { registerDataBrowserRoutes } from './server/dataBrowserRoutes.js';
 import { registerFolderRoutes } from './server/folderRoutes.js';
@@ -64,9 +65,6 @@ import {
   registerUpdateInstallRoute,
   releaseUpdateInstallLease,
 } from './server/updateInstallRoutes.js';
-import { initLicense } from './server/license/index.js';
-import { storeErrorMessage } from './server/license/messages.js';
-import { registerLicenseRoutes } from './server/licenseRoutes.js';
 import { devExtensionRouter, loadDevExtensions } from './server/devExtensions.js';
 import { loadProExtensions, proSlotRouter } from './server/proExtensions.js';
 import { registerStaticRoutes } from './server/staticRoutes.js';
@@ -174,19 +172,6 @@ const secretsWriteLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.', code: 'rate_limited' },
 });
-// Activate and Move to another computer are the only calls that can reach a store: one shared budget
-// (10 per 15 min) so a stuck button can't hammer Gumroad or Lemon Squeezy.
-const licenseNetworkLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    error: 'rate_limited',
-    code: 'rate_limited',
-    message: storeErrorMessage('rate_limited'),
-  },
-});
 // Approving or declining a proposed Javi change runs no model; it gets its own generous
 // budget so a busy AI budget never blocks a confirmation.
 const actionsLimiter = rateLimit({
@@ -210,7 +195,7 @@ const postLimiter = (limiter, skip) => (req, res, next) =>
 // Actions run no model, conversation creation is a plain DB write and the inbox only reads markers: none spends the strict AI budget.
 const isActionsPath = (req) => /^\/(actions|conversations|inbox)(\/|$)/i.test(req.path);
 // Secrets, data-browser, export and sheets-proxy (carries statement data) responses must never be cached, including limiter/auth errors.
-app.use(['/api/secrets', '/api/data', '/api/export', '/api/sheets/csv', '/api/license', '/api/dev', '/api/folders', '/api/jarvis/inbox'], (req, res, next) => {
+app.use(['/api/secrets', '/api/data', '/api/export', '/api/sheets/csv', '/api/dev', '/api/folders', '/api/jarvis/inbox'], (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });
@@ -377,7 +362,7 @@ app.get('/api/jarvis/status', async (req, res) => {
   res.json(await describeAi('tools'));
 });
 
-// The Pro module registers POST /api/jarvis and POST /api/jarvis/actions/:token behind requirePro (server/proRoutes.js).
+// The Pro module registers POST /api/jarvis and POST /api/jarvis/actions/:token (server/proRoutes.js).
 app.use(proSlotRouter('jarvis'));
 
 // Javi conversation history (best-effort; 503s if the local database is unavailable).
@@ -648,10 +633,6 @@ registerUpdateInstallRoute(app);
 registerManualDownloadRoute(app);
 // Settings > AI (Ollama host, models, optional cloud provider), behind the auth gate.
 registerAiSettingsRoutes(app);
-// Store license keys (status, activate, deactivate, remove, trial), behind the auth gate and the desktop gate.
-// The network limiter sits after the auth gate so unauthenticated requests cannot spend the budget (no-store is set earlier).
-app.use(['/api/license/activate', '/api/license/deactivate'], postLimiter(licenseNetworkLimiter));
-registerLicenseRoutes(app);
 // Optional developer extensions install their routes into this router (empty unless startServer loaded one;
 // stable bundles cannot load any).
 app.use(devExtensionRouter());
@@ -715,7 +696,7 @@ export async function startServer({ port, host, handleSignals = false, log = fal
     throw Object.assign(new Error('Startup security check failed'), { code: 'startup_security' });
   }
   // Channel isolation guards. Pure path and string checks that run before anything touches the data folder
-  // (restore journal, secrets, key file, license, database).
+  // (restore journal, secrets, key file, database).
   const shellChannel = DESKTOP ? checkShellChannel() : { ok: true };
   const dataLocationGuard = shellChannel.ok ? checkDataLocation({ dataLocation: getDataLocation(), distribution: getDistribution(), channel: getChannel() }) : shellChannel;
   const dataDirGuard = dataLocationGuard.ok ? checkDevDataDir() : dataLocationGuard;
@@ -724,7 +705,7 @@ export async function startServer({ port, host, handleSignals = false, log = fal
     throw Object.assign(new Error('Startup security check failed'), { code: 'startup_security' });
   }
   // Store build, user profile data location: the data folder must be missing, empty or carry our marker. Decided here, before the
-  // desktop handshake, the import recovery, the restore journal, the database, the key file and the license touch the folder, so a
+  // desktop handshake, the import recovery, the restore journal, the database, the key file touch the folder, so a
   // folder that is not ours is never written to (server/dataFolderOwnership.js). Throws `data_dir_not_ours` (exit code 5).
   try {
     ensureDataDirOwnership();
@@ -791,7 +772,8 @@ export async function startServer({ port, host, handleSignals = false, log = fal
   // A prepared import that was cancelled at this start (data added meanwhile, or the staged files no longer verified): an audit
   // row and a note that Home and Settings show once.
   if (importCancelledReason !== null) await recordCancelledImport(importCancelledReason);
-  initLicense({ dataDir: path.dirname(resolveDbPath()), distDir: DIST_DIR });
+  // Every data folder gets its secrets.key at first start (the direct-Burrow import requires one); never throws.
+  loadOrCreateKeyFile({ dir: path.dirname(resolveDbPath()) });
   // Optional developer extensions (no-op in every stable bundle) install before the socket opens.
   await loadDevExtensions();
   // The optional Pro module (absent in a Free build) registers its routes, jobs and texts before the socket opens.

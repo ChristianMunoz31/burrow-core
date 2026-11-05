@@ -2,7 +2,6 @@
 // pasted path being refused where dialogs exist, and confirming an imported folder. The shell is replaced by signed replies
 // (the same MAC the real shell computes), the file system and database are real temp ones, Ollama is the fake one.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import request from 'supertest';
 
 vi.mock('../../loadEnv.js', () => ({}));
@@ -17,7 +16,6 @@ import { cancelAllFolderJobs, drainFolderJobs, waitForFolderJob } from '../folde
 import { __setPathOptionsForTests } from '../folders/pathSafety.js';
 import { getFolder, insertFolder, updateFolder } from '../folders/store.js';
 import { __setBusyDelaysForTests } from '../folders/summarize.js';
-import { resetPro } from './helpers/pro.js';
 import { installFakeOllama, textReply } from './helpers/fakeOllama.js';
 import { COPY, errorBody, makeTmp, neutralPathOptions, rmTree, tryDirLink, writeTree } from './helpers/foldersEnv.js';
 import { SAME_ORIGIN, captureRequests, deliver, makeDialogApp, startDialogs, stopDialogs } from './helpers/dialogHarness.js';
@@ -84,7 +82,6 @@ afterEach(async () => {
   cancelAllFolderJobs('shutdown');
   await drainFolderJobs({ timeoutMs: 2000 });
   stopDialogs();
-  resetPro();
   vi.restoreAllMocks();
 });
 

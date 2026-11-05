@@ -18,9 +18,7 @@
 //
 // Timing: Burrow talks to Ollama through node-fetch, so instead of wrapping fetch the eval points the
 // app's own Ollama host setting (ai.settings in the temp database) at a passive loopback proxy that
-// records each /api/chat request and Ollama's final `done` chunk. Pro paths run under the temporary
-// local trial of the temp data dir (scripts/lib/evalTrial.js, shared with the Pro Javi evals). No product
-// code or gate is changed.
+// records each /api/chat request and Ollama's final `done` chunk. No product code is changed.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -390,7 +388,6 @@ async function runEval(args, state, runners, resultsDir) {
   const ai = await import('../server/ai/index.js');
   const { MSG_UNGROUNDED, MSG_CUT_SHORT } = await import('../server/javi/advisorService.js');
   const { registerJaviAdvisorRoutes } = await import('../server/javiAdvisorRoutes.js');
-  const { startEvalTrial } = await import('./lib/evalTrial.js');
   const { startRecordingProxy, unloadModel, loadedModels } = await import('./lib/javiEval/ollamaProxy.js');
   const { seedFixture, computeGroundTruth } = await import('./lib/javiEval/fixture.js');
   const { loadClientBuilders } = await import('./lib/javiEval/clientBuilders.js');
@@ -422,8 +419,7 @@ async function runEval(args, state, runners, resultsDir) {
   }
   const ollamaVersion = await fetch(`${upstream}/api/version`).then((r) => r.json()).then((j) => j.version).catch(() => null);
 
-  // 3. Pro via the temp-folder trial, then the synthetic fixture and its ground truth.
-  startEvalTrial(state.dataDir);
+  // 3. The synthetic fixture and its ground truth.
   const now = new Date();
   await seedFixture({ insert: query.insert, data, now });
   const gt = await computeGroundTruth({ data, select: query.select, now });

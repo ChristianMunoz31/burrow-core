@@ -203,7 +203,7 @@ describe('H1: a restore keeps this install\'s settings and keys', () => {
   });
 });
 
-describe('the store license survives a restore (docs/LICENSING.md 5.4, 5.5)', () => {
+describe('legacy license records older versions kept survive a restore', () => {
   it('license.activation is protected and carried, and the live LICENSE_STORE_KEY secret is carried too', async () => {
     expect(PROTECTED_APP_STATE_KEYS).toContain('license.activation');
     expect(RESTORE_CARRY_KEYS).toContain('license.activation');

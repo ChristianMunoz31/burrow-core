@@ -376,7 +376,7 @@ describe('runRelease with fixtures (no real git, gh or build)', () => {
     expect(publishFn.mock.calls[0][0].env.GH_TOKEN).toBe('fake-token');
   });
 
-  it('after a real publish it runs the Gumroad sync as a dry run, then a publish with its own prompt; a dry run or a decline never does', async () => {
+  it('with --gumroad, after a real publish it runs the Gumroad sync as a dry run, then a publish with its own prompt; a dry run or a decline never does', async () => {
     stage();
     writeManifest();
     fs.mkdirSync(path.join(root, '.sidecar-build'));
@@ -386,9 +386,12 @@ describe('runRelease with fixtures (no real git, gh or build)', () => {
     const gumroadFn = vi.fn(async (o) => { order.push(o.publish ? 'gumroad-publish' : 'gumroad-dry'); });
     const base = { root, env: {}, exec: makeExec(), log: () => {}, publishFn, channelRun: () => 0, gumroadFn };
     await runRelease(opts(), { ...base, confirm: vi.fn() });
-    await runRelease(opts({ publish: true, dryRun: false }), { ...base, confirm: vi.fn(async () => false) });
+    await runRelease(opts({ publish: true, dryRun: false, gumroad: true }), { ...base, confirm: vi.fn(async () => false) });
     expect(gumroadFn).not.toHaveBeenCalled();
-    const res = await runRelease(opts({ publish: true, dryRun: false, yes: true }), { ...base, confirm: vi.fn() });
+    const plain = await runRelease(opts({ publish: true, dryRun: false, yes: true }), { ...base, confirm: vi.fn() });
+    expect(plain.published).toBe(true);
+    expect(gumroadFn, 'the Gumroad sync is not a default step').not.toHaveBeenCalled();
+    const res = await runRelease(opts({ publish: true, dryRun: false, yes: true, gumroad: true }), { ...base, confirm: vi.fn() });
     expect(res.published).toBe(true);
     expect(order.slice(-3)).toEqual(['publish', 'gumroad-dry', 'gumroad-publish']);
     expect(gumroadFn.mock.calls[0][0]).toMatchObject({ tag: 'v0.2.0', dryRun: true, publish: false });
@@ -402,7 +405,7 @@ describe('runRelease with fixtures (no real git, gh or build)', () => {
     fs.writeFileSync(path.join(root, '.sidecar-build', 'server.cjs'), '/*! BURROW_CHANNEL=stable */');
     const lines = [];
     const gumroadFn = vi.fn(async () => { throw new Error('a version number (0.1.0) is written in the description'); });
-    const res = await runRelease(opts({ publish: true, dryRun: false, yes: true }), { root, env: {}, exec: makeExec(), log: (l) => lines.push(l), publishFn: vi.fn(async () => ({})), channelRun: () => 0, gumroadFn });
+    const res = await runRelease(opts({ publish: true, dryRun: false, yes: true, gumroad: true }), { root, env: {}, exec: makeExec(), log: (l) => lines.push(l), publishFn: vi.fn(async () => ({})), channelRun: () => 0, gumroadFn });
     expect(res.published).toBe(true);
     expect(gumroadFn).toHaveBeenCalledTimes(1);
     expect(lines.join('\n')).toContain('the release is published, but the Gumroad pages were not updated: a version number');

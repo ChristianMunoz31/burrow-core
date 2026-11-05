@@ -25,9 +25,9 @@ describe('DangerZone', () => {
     setup();
     const zone = screen.getByRole('region', { name: 'Danger zone' });
     expect(zone).toHaveTextContent('permanently deletes everything you saved in Burrow on this computer');
-    expect(zone).toHaveTextContent('Kept: your license (unless you remove it), your Pro trial status, and your backups (unless you delete them too).');
+    expect(zone).toHaveTextContent('Kept: your backups (unless you delete them too).');
     expect(zone).toHaveTextContent('This cannot be undone.');
-    expect(zone).not.toHaveTextContent(/database|sqlite|—/i);
+    expect(zone).not.toHaveTextContent(/database|sqlite|—|licen[sc]e|trial/i);
   });
 
   it('does not load or show the dialog until the button is pressed, then opens it', async () => {

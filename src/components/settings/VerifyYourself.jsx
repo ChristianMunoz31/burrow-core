@@ -72,7 +72,7 @@ export default function VerifyYourself() {
         <li value={desktop ? 4 : 2}>
           <p className="font-semibold text-slate-slate100">See what Burrow connected to</p>
           <p>
-            Open Network activity in this section to see the connections Burrow made: the feature, the website, the time and the result. A Buy Burrow Pro link opens the store page in your browser, so it is not a Burrow connection.
+            Open Network activity in this section to see the connections Burrow made: the feature, the website, the time and the result.
           </p>
         </li>
       </ol>
@@ -81,7 +81,7 @@ export default function VerifyYourself() {
         <a href={CORE_URL} target="_blank" rel="noopener noreferrer" className={LINK}>
           github.com/ChristianMunoz31/burrow-core
         </a>
-        . Pro features are a private module.
+        . A few features come from a private module that the official Burrow app includes at no cost.
       </p>
     </div>
   );

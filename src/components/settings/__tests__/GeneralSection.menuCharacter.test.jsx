@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -12,11 +12,18 @@ vi.mock('../../../hooks/useJarvisStatus', () => ({
 
 vi.mock('../DisplayNameField', () => ({ default: () => null }));
 
-vi.mock('../../license/ProGateNotice', () => ({
-  default: ({ capability }) => <div data-testid="pro-gate" data-capability={capability} />,
+// Whether the private module's UI is compiled into the build under test.
+const build = vi.hoisted(() => ({ moduleIncluded: true }));
+vi.mock('../../../extensions/proExtensions', () => ({
+  get PRO_UI_INCLUDED() {
+    return build.moduleIncluded;
+  },
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  build.moduleIncluded = true;
+});
 
 const renderSection = (props = {}) =>
   render(
@@ -47,7 +54,7 @@ describe('GeneralSection hide subcategories', () => {
 });
 
 describe('GeneralSection Javi character', () => {
-  it('shows the four characters with Butler selected by default', () => {
+  it('shows the four characters with Butler selected by default when the module is included', () => {
     renderSection();
     const labels = JAVI_CHARACTERS.map((c) => c.label);
     expect(labels).toEqual(['Butler', 'Valet', 'Concierge', 'Majordomo']);
@@ -80,42 +87,23 @@ describe('GeneralSection Javi character', () => {
   });
 });
 
-describe('GeneralSection Javi character when locked (Pro perk)', () => {
-  it('marks the three Pro characters, keeps Butler plain and mentions Pro in the hint', () => {
-    renderSection({ charactersLocked: true });
-    expect(screen.getByRole('radio', { name: 'Butler' })).toBeChecked();
-    for (const label of ['Valet', 'Concierge', 'Majordomo']) {
-      expect(screen.getByRole('radio', { name: `${label} (Pro)` })).toBeInTheDocument();
-      expect(screen.queryByRole('radio', { name: label })).not.toBeInTheDocument();
-    }
-    expect(characterGroup()).toHaveAccessibleDescription(
-      JAVI_CHARACTERS[0].description + HINT_TAIL + ' Valet, Concierge and Majordomo come with Burrow Pro.',
-    );
+describe('GeneralSection Javi character in a core-only build', () => {
+  beforeEach(() => {
+    build.moduleIncluded = false;
   });
 
-  it('shows Butler even when a Pro character is saved', () => {
-    renderSection({ charactersLocked: true, javiCharacter: 'valet' });
+  it('offers Butler only, with no Pro label, notice or upgrade wording', () => {
+    const { container } = renderSection();
+    expect(screen.getAllByRole('radio')).toHaveLength(1);
     expect(screen.getByRole('radio', { name: 'Butler' })).toBeChecked();
-    expect(screen.getByRole('radio', { name: 'Valet (Pro)' })).not.toBeChecked();
+    expect(characterGroup()).toHaveAccessibleDescription(JAVI_CHARACTERS[0].description + HINT_TAIL);
+    expect(container.textContent).not.toMatch(/\bpro\b|buy|upgrade|licen[sc]e|trial/i);
   });
 
-  it('does not save a Pro pick and shows the Pro notice instead', async () => {
+  it('shows Butler even when another character is saved, without rewriting the saved choice', () => {
     const onJaviCharacterChange = vi.fn();
-    const user = userEvent.setup();
-    renderSection({ charactersLocked: true, onJaviCharacterChange });
-    expect(screen.queryByTestId('pro-gate')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('radio', { name: 'Valet (Pro)' }));
+    renderSection({ javiCharacter: 'valet', onJaviCharacterChange });
+    expect(screen.getByRole('radio', { name: 'Butler' })).toBeChecked();
     expect(onJaviCharacterChange).not.toHaveBeenCalled();
-    expect(screen.getByTestId('pro-gate')).toHaveAttribute('data-capability', 'javi_characters');
-    expect(screen.getByRole('radio', { name: 'Butler' })).toBeChecked();
-  });
-
-  it('is unchanged when not locked: no labels, no notice, the pick is saved', async () => {
-    const onJaviCharacterChange = vi.fn();
-    const user = userEvent.setup();
-    renderSection({ onJaviCharacterChange });
-    await user.click(screen.getByRole('radio', { name: 'Valet' }));
-    expect(onJaviCharacterChange).toHaveBeenCalledWith('valet');
-    expect(screen.queryByTestId('pro-gate')).not.toBeInTheDocument();
   });
 });

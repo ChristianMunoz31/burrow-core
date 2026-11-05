@@ -8,14 +8,12 @@ vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 vi.mock('../javi/advisorService.js', () => ({ generateAdvice: vi.fn(), streamAdvice: vi.fn() }));
 vi.mock('../auditHook.js', () => ({ recordAudit: vi.fn(async () => {}), setAuditSink: vi.fn() }));
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 
 import fetch from 'node-fetch';
 import { generateAdvice } from '../javi/advisorService.js';
 import { installFakeOllama } from './helpers/fakeOllama.js';
 import { __resetAiForTests } from '../ai/index.js';
 import { createTestDb, closeTestDb } from './helpers/testDb.js';
-import { resetPro } from './helpers/pro.js';
 import { openDb, selectOne, setDbForTests } from '../db/index.js';
 import { __resetDataGenerationForTests } from '../dataGeneration.js';
 import { INBOX_PAGES, INBOX_STATE_KEY } from '../javi/inbox.js';
@@ -45,7 +43,6 @@ beforeEach(() => {
   logs = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => {
-  resetPro();
   vi.restoreAllMocks();
   if (db) closeTestDb(db);
   db = null;

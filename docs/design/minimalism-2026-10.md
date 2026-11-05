@@ -1,5 +1,7 @@
 # Minimalism pass and back button (2026-10)
 
+> Note 2026-11-05: the trial pill, License section and Pro gating described below were removed by [ADR 0002](../adr/0002-free-for-everyone.md) (Burrow is free for everyone). Kept as design history.
+
 Branch `feat/back-button-minimal` (from `origin/main`, v1.1.0). Design only; coders implement it exactly.
 
 Pattern source: commit 224017f "feat(folders): minimalist pass". The design tool had no shell, so the commit diff itself was not read; the pattern is taken from the code that commit left behind: `src/components/folders/FolderMoreMenu.jsx` (one "⋯" text-glyph trigger, `.glass-menu`, `role="menu"`, Arrow/Home/End/Tab/Escape keyboard model, focus back to the trigger on every choice), `src/components/folders/folderStyles.js` (`ICON_BTN`, quiet `TOGGLE`, `MENU_ITEM`) and `FolderCard.jsx` (one visible primary action, Re-scan; everything else in the More menu or behind quiet toggles; no boxes around toggles).

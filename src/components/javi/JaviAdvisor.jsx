@@ -4,13 +4,10 @@ import { JAVI_MAX_INPUT_CHARS, JAVI_PAGES, resolveJaviBarPageKey } from '../../c
 import { usePageContextReader, usePageData } from '../../contexts/PageContextContext';
 import { useJaviSession } from '../../hooks/useJaviSession';
 import { useCachedJarvisAi } from '../../hooks/useCachedJarvisAi';
-import { useJaviAgent } from '../../extensions/proExtensions';
-import { isFreeUi, useEntitlements, useRefreshEntitlements } from '../../hooks/useEntitlements';
-import { PRO_REQUIRED } from '../../utils/apiError';
+import { PRO_UI_INCLUDED, useJaviAgent } from '../../extensions/proExtensions';
 import { useJaviInbox } from '../../hooks/useJaviInbox';
 import { inEditable, isModalOpen } from '../shell/shortcutGuard';
 import JaviBar from './JaviBar';
-import { EMPTY_AGENT } from './timeline';
 import { errorWaitMs } from './retryWait';
 import { JAVI_OPEN_EVENT } from './openJavi';
 
@@ -62,10 +59,10 @@ function JaviPanelFallback() {
 /**
  * Always-mounted host (AppShell). Owns the per-page advice history, the free-form Javi chat
  * (useJaviAgent), the open state and the "auto-advice exactly once per open" rule. Navigation
- * alone never calls the LLM. Free gets one advice card per page and no conversation (follow-ups,
- * typed questions, chips); the session collapses to that card live when Pro drops. Also opens the
+ * alone never calls the LLM. Advice follow-ups work in every build; typed questions and change requests come from
+ * the private module and exist only when it is compiled in (`PRO_UI_INCLUDED`). Also opens the
  * panel on the 'javi:open' event (command palette), sending the question straight away unless
- * Javi is busy; on Free nothing is sent and the panel shows the Pro notice instead.
+ * Javi is busy; without the module nothing is sent and the panel shows the not-included notice instead.
  * `visible` means Javi is available on this page (the panel can open); `showLauncher` only
  * controls whether the docked Javi bar is drawn, so hiding it never disables Javi (the window's
  * header button then says Close instead of Collapse).
@@ -79,8 +76,6 @@ function JaviPanelFallback() {
 export default function JaviAdvisor({ pageKey, visible, showLauncher = true, autoAdvise }) {
   const { readPageContext } = usePageContextReader();
   const { ai: statusAi } = useCachedJarvisAi();
-  const entitlements = useEntitlements();
-  const free = isFreeUi(entitlements, 'javi_conversation');
   const navigate = useNavigate();
   const inboxPage = visible ? pageKey : null;
   const pageData = usePageData(inboxPage);
@@ -89,11 +84,10 @@ export default function JaviAdvisor({ pageKey, visible, showLauncher = true, aut
   // registers late, then its query may still load), so the status below takes a new baseline when it flips.
   const pageHasData = Boolean(pageData);
   const { markRead, count } = inbox;
-  const session = useJaviSession({ readPageContext, ai: statusAi, conversation: !free });
+  const session = useJaviSession({ readPageContext, ai: statusAi });
   const { threadFor, requestAdvice, sendMessage, retry, abortAll } = session;
   const agent = useJaviAgent();
   const { stop: stopAgent, reset: resetAgent, respond: respondAgent, send: sendAgent } = agent;
-  const refreshEntitlements = useRefreshEntitlements();
   const [open, setOpen] = useState(false);
   const [prefill, setPrefill] = useState(null);
   const [askBlocked, setAskBlocked] = useState(false);
@@ -117,7 +111,7 @@ export default function JaviAdvisor({ pageKey, visible, showLauncher = true, aut
   const sessionFnsRef = useRef({ threadFor, requestAdvice });
   const suppressAutoRef = useRef(false);
   const prefillSeqRef = useRef(0);
-  const liveRef = useRef({ open: false, shown: false, pageKey: null, busy: false, agentRunning: false, free: false });
+  const liveRef = useRef({ open: false, shown: false, pageKey: null, busy: false, agentRunning: false });
   const panelId = useId();
   const available = visible && Boolean(pageKey);
   const barShown = available && showLauncher;
@@ -136,25 +130,6 @@ export default function JaviAdvisor({ pageKey, visible, showLauncher = true, aut
     }
   }, [visible, abortAll, stopAgent]);
 
-  // Pro dropped to Free while open: end any running chat and clear its turns and change requests.
-  // (The advice session collapses itself to its one card.)
-  // A typed question the server refused (stale Pro cache) is remembered as askBlocked before the reset
-  // clears the agent, so the Pro notice outlives the switch.
-  const agentErrorCodeRef = useRef(null);
-  useEffect(() => {
-    agentErrorCodeRef.current = agent.errorCode;
-  });
-  const prevFreeRef = useRef(free);
-  useEffect(() => {
-    if (!prevFreeRef.current && free) {
-      if (agentErrorCodeRef.current === PRO_REQUIRED) setAskBlocked(true);
-      resetAgent();
-    }
-    if (prevFreeRef.current && !free) setAskBlocked(false);
-    prevFreeRef.current = free;
-  }, [free, resetAgent]);
-
-
   // Auto-advice: once per open, only for an empty thread, only when the setting is on, and
   // not while the page's data is still loading (re-checked until ready, so the open is not
   // wasted on an empty snapshot) nor right after a rate-limit error. Keyed on the open
@@ -168,7 +143,6 @@ export default function JaviAdvisor({ pageKey, visible, showLauncher = true, aut
       pageKey,
       busy: agent.running || threadFor(pageKey ?? '').status === 'loading',
       agentRunning: agent.running,
-      free,
       items: inbox.items,
     };
   });
@@ -303,15 +277,15 @@ export default function JaviAdvisor({ pageKey, visible, showLauncher = true, aut
       if (!live.open) {
         openerRef.current = document.activeElement;
         openPageKeyRef.current = live.pageKey;
-        // Free has no typed questions, so the page's one advice card still loads on open.
-        suppressAutoRef.current = Boolean(prompt) && !live.free;
+        // Without the module there are no typed questions, so the page's advice still loads on open.
+        suppressAutoRef.current = Boolean(prompt) && PRO_UI_INCLUDED;
         setAskBlocked(false);
         setOpenSeq((n) => n + 1);
         setOpen(true);
       }
       if (!prompt) return;
-      // Typed questions are Pro: without it nothing is sent and the panel shows the Pro notice.
-      if (live.free) {
+      // Typed questions come from the private module: without it nothing is sent and the panel says so.
+      if (!PRO_UI_INCLUDED) {
         setAskBlocked(true);
       } else if (live.busy) {
         prefillSeqRef.current += 1;
@@ -326,10 +300,9 @@ export default function JaviAdvisor({ pageKey, visible, showLauncher = true, aut
 
   const respond = useCallback(
     async (token, approve) => {
-      const out = await respondAgent(token, approve);
-      if (out?.status === 'error' && out.code === PRO_REQUIRED) refreshEntitlements();
+      await respondAgent(token, approve);
     },
-    [respondAgent, refreshEntitlements],
+    [respondAgent],
   );
 
   const openPanel = useCallback(() => {
@@ -409,7 +382,7 @@ export default function JaviAdvisor({ pageKey, visible, showLauncher = true, aut
             pageLabel={pageLabel}
             thread={threadFor(pageKey)}
             suggestions={page?.suggestions ?? []}
-            agent={free ? EMPTY_AGENT : agent}
+            agent={agent}
             askBlocked={askBlocked}
             prefill={prefill}
             onSend={(text) => sendAgent(text, { page: pageKey })}

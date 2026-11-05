@@ -45,8 +45,6 @@ const available = (over = {}) => ({
   notes: 'New:\n- A plain line',
   canInstall: false,
   canDownload: false,
-  licenseImpact: 'free',
-  updatesUntil: null,
   ...over,
 });
 const ready = (over = {}) => ({
@@ -274,43 +272,12 @@ describe('UpdatesSection: an available update', () => {
     },
   );
 
-  it.each([
-    ['free', 'Updates are free. Your data and settings carry over.'],
-    ['included', 'Your license includes this update. Pro stays on.'],
-  ])('shows the %s license note and keeps the install button', async (licenseImpact, copy) => {
-    await open(available({ canInstall: true, licenseImpact }));
-    const note = screen.getByRole('note');
-    expect(note).toHaveTextContent(copy);
-    expect(note).not.toHaveClass('text-accent-amber');
+  it('shows the install button and no license note, whatever the answer carries', async () => {
+    const { container } = await open(available({ canInstall: true }));
+    expect(screen.queryByRole('note')).toBeNull();
+    expect(container.textContent).not.toMatch(/licen[sc]e|\bPro\b|trial/i);
     expect(screen.getByRole('button', { name: 'Download and install' })).toBeEnabled();
-  });
-
-  it.each([
-    [
-      'blocked',
-      '2029-06-15T23:59:00Z',
-      'Your license includes updates released until Jun 15, 2029. This version came out after that, so Pro would be off in it. Keep this version to keep Pro. Your data and settings stay as they are.',
-    ],
-    [
-      'blocked',
-      null,
-      'Your license includes updates up to a set date. This version came out after it, so Pro would be off in it. Keep this version to keep Pro. Your data and settings stay as they are.',
-    ],
-    [
-      'unknown',
-      null,
-      "Burrow couldn't confirm that your license includes this update, so it won't download it. Close and reopen Burrow, then click Check now.",
-    ],
-  ])('%s shows the amber note and no install or download button, only notes and the link', async (licenseImpact, updatesUntil, copy) => {
-    const { container } = await open(available({ canInstall: true, canDownload: true, licenseImpact, updatesUntil }));
-    const note = screen.getByRole('note');
-    expect(note).toHaveTextContent(copy);
-    expect(container.textContent).not.toMatch(/safe/i);
-    expect(note).toHaveClass('text-accent-amber');
-    expect(screen.queryByRole('button', { name: 'Download and install' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Get the installer' })).toBeNull();
     expect(screen.getByRole('region', { name: "What's new" })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: `See what's new on GitHub${OPENS}` })).toBeInTheDocument();
     noEmDash(container);
   });
 
@@ -512,19 +479,6 @@ describe('UpdatesSection: an available update', () => {
     const line = screen.getByText('Burrow 1.1.0 is available.');
     expect(line).toHaveAttribute('role', 'status');
     expect(line).toHaveClass('sr-only');
-  });
-
-  it('web copy with a blocked license shows only the license note, not the releases page line', async () => {
-    const { container } = await open(available({ licenseImpact: 'blocked', updatesUntil: '2029-06-15T23:59:00Z' }));
-    expect(screen.getByRole('note')).toHaveTextContent('Keep this version to keep Pro.');
-    expect(screen.queryByText(/download the new version from the releases page/)).toBeNull();
-    noEmDash(container);
-  });
-
-  it('web copy with an unknown license shows only the license note, not the releases page line', async () => {
-    await open(available({ licenseImpact: 'unknown' }));
-    expect(screen.getByRole('note')).toHaveTextContent("couldn't confirm that your license includes this update");
-    expect(screen.queryByText(/download the new version from the releases page/)).toBeNull();
   });
 
   it('the installer status line announces the saving state', async () => {

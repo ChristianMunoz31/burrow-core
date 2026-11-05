@@ -5,7 +5,6 @@
 // generation or removed folder during a slow parse, the ext and path agreement, reserved Windows names and the
 // needs-confirm guard of previewFile itself. Synthetic temp folders, fake Ollama, fake parser workers.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import request from 'supertest';
 
 vi.mock('../../loadEnv.js', () => ({}));
@@ -25,7 +24,6 @@ import { __setPathOptionsForTests } from '../folders/pathSafety.js';
 import { clearPreviewCache, previewCacheStats } from '../folders/previewCache.js';
 import { allFileRows, getFolder, updateFile } from '../folders/store.js';
 import { __setBusyDelaysForTests } from '../folders/summarize.js';
-import { FREE, resetPro, setEntitlements } from './helpers/pro.js';
 import { installFakeOllama, textReply } from './helpers/fakeOllama.js';
 import { COPY, errorBody, makeTmp, neutralPathOptions, rmTree, writeTree } from './helpers/foldersEnv.js';
 import { makePdf } from './helpers/synthDocs.js';
@@ -120,7 +118,6 @@ afterAll(() => {
 beforeEach(() => {
   resetDb(db);
   clearPreviewCache();
-  setEntitlements(FREE);
   __setPathOptionsForTests(neutralPathOptions(root));
   __resetAiForTests();
   fetch.mockReset();
@@ -135,7 +132,6 @@ afterEach(async () => {
   __setParserTimeoutForTests(null);
   __setParserMemoryGuardForTests(null);
   __resetDataGenerationForTests();
-  resetPro();
   vi.restoreAllMocks();
 });
 

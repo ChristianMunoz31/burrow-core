@@ -5,7 +5,7 @@ import { PLAIN_REPLY } from '../../scripts/lib/fakeOllamaServer.js';
 import { javi, seedCalendarChange, waitForActivePage } from '../pages/javi.js';
 import { nav } from '../pages/nav.js';
 
-useBurrow({ seed: true, ollama: 'fake', preseed: { trialEnded: true } });
+useBurrow({ seed: true, ollama: 'fake' });
 registerThemeTests(test, 'dark');
 
 test('calculator dialog after a result and an error has no serious or critical violations (dark)', async ({ page }, testInfo) => {
@@ -54,13 +54,13 @@ test('open navigation menu has no serious or critical violations (dark)', async 
   const n = nav(page);
   const list = await n.openDrawer();
   await expect(page.getByRole('dialog').getByRole('group')).toHaveCount(3);
-  for (const name of ['Budget', 'Productivity', 'Health']) await expect(n.drawerSection(name)).toBeVisible();
+  for (const name of ['Financials', 'Health', 'Productivity']) await expect(n.drawerSection(name)).toBeVisible();
   // Every section expanded, so the scan covers every row as well as the header buttons.
   await n.openAllSections();
-  await expect(list.getByRole('separator')).toHaveCount(1);
+  await expect(list.getByRole('link').first()).toHaveText('Home');
   await page.waitForLoadState('networkidle');
-  // The whole page: Home, the three sections under their h3 dropdown headers (Journal active), the divider
-  // and Calendar over the dimmed page.
+  // The whole page: Home, Calendar and the three sections under their h3 dropdown headers (Journal active)
+  // over the dimmed page.
   const violations = await scan(page, testInfo, { name: 'drawer-open', theme: 'dark' });
   expect(describe(violations), 'axe violations on the open navigation menu (dark)').toEqual([]);
 });

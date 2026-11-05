@@ -1,5 +1,4 @@
 import {
-  BadgeCheck,
   Cpu,
   Database,
   Globe,
@@ -22,7 +21,6 @@ export const SETTINGS_SECTIONS = [
   { id: 'privacy', label: 'Privacy & activity', icon: ShieldCheck },
   { id: 'network', label: 'Network', icon: Globe },
   { id: 'api-keys', label: 'Connected services', icon: KeyRound },
-  { id: 'license', label: 'License', icon: BadgeCheck },
   { id: 'updates', label: 'Updates', icon: RefreshCw },
 ];
 

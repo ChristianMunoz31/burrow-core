@@ -1,14 +1,12 @@
 // Javi inbox (server/javi/inbox.js): normalized read markers, derived items, the unseen pages and the write
-// observer (every write counts, also one made on the page on screen; owner decision 2026-10-10). Real in-memory SQLite; the license module is real except getEntitlements (helpers/pro.js).
+// observer (every write counts, also one made on the page on screen; owner decision 2026-10-10). Real in-memory SQLite.
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 
 import { createTestDb, closeTestDb } from './helpers/testDb.js';
-import { FREE, resetPro, setEntitlements } from './helpers/pro.js';
 import { TABLES, insert, remove, selectOne, update, upsert } from '../db/index.js';
 import { bumpDataGeneration, runDataResetHooks } from '../dataGeneration.js';
 import { importParsed } from '../import/importExport.js';
@@ -44,7 +42,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   uninstall();
-  resetPro();
   closeTestDb(db);
   vi.restoreAllMocks();
 });
@@ -318,7 +315,7 @@ describe('briefing item', () => {
   const putBriefing = (generatedAt) =>
     upsert('app_state', { key: 'jarvis.briefing.latest', value: { generatedAt, digest: 'd', alerts: [] } }, { conflict: ['key'] });
 
-  it('is Pro only and newer than the marker', () => {
+  it('shows only a briefing newer than the marker', () => {
     putBriefing(new Date(Date.now() - 60_000).toISOString());
     markRead([]);
     // A briefing written before the baseline never surfaces.
@@ -328,8 +325,6 @@ describe('briefing item', () => {
     const later = { now: () => new Date(created + 60_000) };
     expect(listInboxItems(later).map((i) => i.id)).toEqual(['briefing']);
     expect(listInboxItems(later)[0]).toMatchObject({ kind: 'briefing', page: 'home', to: '/', label: "Today's briefing is ready" });
-    setEntitlements(FREE);
-    expect(listInboxItems(later)).toEqual([]);
   });
 
   it('a future or invalid generatedAt gives no item', () => {
@@ -349,14 +344,6 @@ describe('briefing item', () => {
     markRead(['briefing'], { now: () => now });
     expect(rawRow().value.briefingSeenAt).toBe(now.toISOString());
     expect(ids()).toEqual([]);
-  });
-
-  it('a Free user marking briefing read is a no-op', () => {
-    putRaw({ v: 1, createdAt: '2026-01-01T00:00:00.000Z', pages: {}, briefingSeenAt: null, foldersSeenAt: null });
-    putBriefing(new Date(Date.now() - 5000).toISOString());
-    setEntitlements(FREE);
-    markRead(['briefing']);
-    expect(rawRow().value.briefingSeenAt).toBe(null);
   });
 });
 

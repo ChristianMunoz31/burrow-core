@@ -19,7 +19,7 @@ pub const REPORT_CONTENT_ID: &str = "report-content";
 /// Help > Check for updates...: only opens Settings > Updates in the window; no network call, no IPC.
 pub const CHECK_UPDATES_ID: &str = "check-updates";
 
-/// Where reports go. Must equal `supportContact` in config/store.json (a unit test checks it).
+/// Where reports go. Must equal `supportContact` in config/support.json (a unit test checks it).
 const SUPPORT_EMAIL: &str = "burrowsupport@gmail.com";
 const REPORT_SUBJECT: &str = "Burrow: report AI content";
 /// A template with no user data: nothing from the app is added to it.
@@ -179,8 +179,8 @@ mod tests {
     }
 
     #[test]
-    fn support_address_matches_config_store_json() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../config/store.json");
+    fn support_address_matches_config_support_json() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../config/support.json");
         let raw = std::fs::read_to_string(path).unwrap();
         let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
         assert_eq!(json["supportContact"].as_str(), Some(SUPPORT_EMAIL));

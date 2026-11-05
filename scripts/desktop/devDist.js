@@ -1,5 +1,5 @@
 // Which UI `npm run desktop:dev` runs, and when it rebuilds dist/. The normal UI (npm run build) is the default; the
-// developer tools UI (npm run build:devtools, the license tier switcher) only with `npm run desktop:dev -- --devtools`.
+// developer tools UI (npm run build:devtools, the placeholder status route) only with `npm run desktop:dev -- --devtools`.
 // dist/ is rebuilt when it is missing, when its developer tools presence differs from the requested mode, or when the
 // stamp written after the last desktop:dev build does not match the current git HEAD or the worktree has changes.
 // The stamp lives in dist/ on purpose: any other `vite build` empties dist/ and so removes it, which forces a rebuild.

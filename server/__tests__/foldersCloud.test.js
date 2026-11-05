@@ -1,7 +1,6 @@
 // More cloud cases for Folders (the base ones are in cloudFolders.test.js): the category turned off in the middle of
 // a job, and the Network activity rows for folder calls.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import request from 'supertest';
 
 vi.mock('../../loadEnv.js', () => ({}));

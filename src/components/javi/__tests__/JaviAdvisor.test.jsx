@@ -1,7 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
-vi.mock('../../../hooks/useEntitlements', async () => (await import('../../../test-utils/entitlements.js')).entitlementsModule());
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
@@ -13,25 +12,7 @@ import { PageContextProvider, usePageContext } from '../../../contexts/PageConte
 import { resolveJaviPageKey } from '../../../constants/javiPages';
 import { allowSlowSuite } from '../../../test-utils/slowSuite';
 import { answerInbox, resetInbox } from '../../../test-utils/javiInbox.js';
-import {
-  FREE_STATE,
-  refreshEntitlementsMock,
-  resetEntitlementsState,
-  setEntitlementsState,
-} from '../../../test-utils/entitlements.js';
-
-// ProGateNotice and BuyProLink read the license status. The entitlement mock above says Free with the
-// trial ended; this is the matching license status, so the notice renders (as in ProGating.test.jsx).
-const license = vi.hoisted(() => ({ status: null }));
-vi.mock('../../../hooks/useLicense', () => ({ useLicense: () => ({ status: license.status }) }));
-const FREE_LICENSE = {
-  state: 'update_window_passed',
-  pro: false,
-  license: null,
-  proSource: null,
-  purchaseUrl: 'https://example.com/buy-burrow-pro',
-  trial: { state: 'ended' },
-};
+import { PRO_NOT_INCLUDED_COPY } from '../../../constants/proFeatures';
 
 // mockFetch serves page advice (and anything else); typed questions go to /api/jarvis, served by
 // jarvisFetch; conversation creation is answered inline.
@@ -106,13 +87,10 @@ beforeEach(() => {
   mockFetch.mockReset();
   jarvisFetch.mockReset();
   mockFetch.mockResolvedValue(ok('**Advice** here'));
-  license.status = FREE_LICENSE;
-  refreshEntitlementsMock.mockClear();
 });
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  resetEntitlementsState();
 });
 
 // Heavy render-and-wait suite: raise the time limits so a busy machine does not trip them.
@@ -341,9 +319,8 @@ describe('markdown safety', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer nofollow');
     expect(link.parentElement).toHaveTextContent('a (example.com)');
     const links = within(screen.getByRole('dialog')).getAllByRole('link');
-    // The model's own links: only the http one is live. The extra links are the Report mailto (policy 11.16) and,
-    // in a build without the Pro UI (always Free), the Buy Pro link of the follow-up hint.
-    const modelHttp = links.filter((l) => l.getAttribute('href').startsWith('http') && l.getAttribute('href') !== FREE_LICENSE.purchaseUrl);
+    // The model's own links: only the http one is live. The extra link is the Report mailto (policy 11.16).
+    const modelHttp = links.filter((l) => l.getAttribute('href').startsWith('http'));
     expect(modelHttp).toHaveLength(1);
     expect(links.filter((l) => l.getAttribute('href').startsWith('mailto:'))).toHaveLength(1);
     expect(screen.getByText('b')).toBeInTheDocument();
@@ -370,8 +347,7 @@ describe('javi:open event (command palette)', () => {
     expect(jarvisFetch).not.toHaveBeenCalled();
   });
 
-  it('while Free the question is not sent and there is no composer', async () => {
-    setEntitlementsState(FREE_STATE);
+  it('without the module the question is not sent and there is no composer', async () => {
     mount({ autoAdvise: false });
     act(() => openJavi({ prompt: 'what is due today' }));
     await screen.findByRole('dialog');
@@ -391,10 +367,9 @@ describe('javi:open event (command palette)', () => {
 
 });
 
-describe('Free: one insight card per page', () => {
+describe('Core-only build: advice without the module', () => {
   const chipName = 'What should I tackle first?';
-  const hintText = /Ask follow-up questions with Pro./;
-  const proNotice = () => screen.queryByText(/This is a Burrow Pro feature/);
+  const proNotice = () => screen.queryByText(PRO_NOT_INCLUDED_COPY);
   const fetchSpy = vi.fn(routedFetch);
   // Every request that is not the single-shot advice call (typed questions, conversations, actions). The inbox and
   // the briefing read run no model and are not Javi requests.
@@ -408,33 +383,34 @@ describe('Free: one insight card per page', () => {
   beforeEach(() => {
     fetchSpy.mockClear();
     vi.stubGlobal('fetch', fetchSpy);
-    setEntitlementsState(FREE_STATE);
   });
 
-  it('shows the card, the hint and the Buy link, and no composer, chips or New conversation', async () => {
+  it('shows the card with no composer or New conversation, no upgrade hint and no link to buy anything', async () => {
     const user = userEvent.setup();
     mount();
     await user.click(bar());
     await screen.findByText('Advice');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: chipName })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start a new conversation with Javi' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
-    expect(screen.getByText(hintText)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Buy Burrow Pro/ })).toHaveAttribute('href', 'https://example.com/buy-burrow-pro');
+    expect(screen.getByRole('dialog').textContent).not.toMatch(/\bpro\b|buy|upgrade|licen[sc]e|trial/i);
     expect(proNotice()).not.toBeInTheDocument();
     expect(adviceBodies()).toEqual([{ page: 'todos', context: expect.any(String), messages: [] }]);
     expect(jarvisCallsOtherThanAdvice()).toEqual([]);
   });
 
-  it('omits the Buy link when no purchase URL is configured, keeping the hint', async () => {
-    license.status = { ...FREE_LICENSE, purchaseUrl: '' };
+  it('a follow-up chip sends an advice follow-up, which is core code in every build', async () => {
     const user = userEvent.setup();
     mount();
     await user.click(bar());
     await screen.findByText('Advice');
-    expect(screen.getByText(hintText)).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Buy Burrow Pro/ })).not.toBeInTheDocument();
+    mockFetch.mockResolvedValueOnce(ok('**Follow-up** answer'));
+    await user.click(screen.getByRole('button', { name: chipName }));
+    await screen.findByText('Follow-up');
+    const bodies = adviceBodies();
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1].messages.at(-1)).toMatchObject({ role: 'user', content: chipName });
+    expect(jarvisCallsOtherThanAdvice()).toEqual([]);
   });
 
   it('puts focus on Close, not a composer', async () => {
@@ -445,7 +421,7 @@ describe('Free: one insight card per page', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Collapse Javi' })).toHaveFocus());
   });
 
-  it('shows the one-insight empty state when auto-advice is off, and Get advice loads the card', async () => {
+  it('shows the empty state when auto-advice is off, and Get advice loads the card', async () => {
     const user = userEvent.setup();
     mount({ autoAdvise: false });
     await user.click(bar());
@@ -501,7 +477,7 @@ describe('Free: one insight card per page', () => {
     expect(signal.aborted).toBe(true);
   });
 
-  it('a palette question sends no typed or follow-up request, still loads the card, and shows the Pro notice', async () => {
+  it('a palette question sends no typed or follow-up request, still loads the card, and shows the not-included notice', async () => {
     mount({ autoAdvise: true });
     act(() => openJavi({ prompt: 'what is due today' }));
     await screen.findByRole('dialog');
@@ -513,7 +489,7 @@ describe('Free: one insight card per page', () => {
     expect(bodies.every((b) => b.messages.length === 0)).toBe(true);
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(proNotice()).toBeInTheDocument();
-    expect(document.querySelector('[data-capability="javi_conversation"]')).toBeInTheDocument();
+    expect(document.querySelector('[data-reason="pro_not_included"]')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -559,31 +535,4 @@ describe('Free: one insight card per page', () => {
     await screen.findByText('Advice');
     expect(proNotice()).not.toBeInTheDocument();
   });
-
-  it('a pro_required advice error shows the Pro notice, not the red error row or Retry, and re-reads the license', async () => {
-    const user = userEvent.setup();
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 403,
-      json: async () => ({ error: 'pro_required', feature: 'javi_conversation', message: 'raw server text' }),
-    });
-    mount();
-    await user.click(bar());
-    await waitFor(() => expect(proNotice()).toBeInTheDocument());
-    expect(document.querySelector('[data-capability="javi_conversation"]')).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.queryByText(/raw server text/)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
-    expect(refreshEntitlementsMock).toHaveBeenCalled();
-  });
-
-  it('trial ended: the card and the hint, with no composer', async () => {
-    const user = userEvent.setup();
-    mount();
-    await user.click(bar());
-    await screen.findByText('Advice');
-    expect(screen.getByText(hintText)).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Message Javi' })).not.toBeInTheDocument();
-  });
 });
-

@@ -1,13 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useSyncedSetting } from '../hooks/useSyncedSetting';
-import { readFounderPerkCache, writeFounderPerkCache } from '../utils/founderPerkCache';
-import { useLicenseFlags } from '../hooks/useLicense';
 import {
   SETTINGS_DEFAULTS,
   SETTINGS_KEYS,
-  FOUNDER_BACKGROUND,
   normalizeBackground,
-  resolveBackground,
   normalizeThemePreference,
 } from '../constants/settingsDefaults';
 
@@ -84,23 +80,8 @@ export function ThemeProvider({ children }) {
   const savedBgLight = normalizeBackground(storedBgLight);
   const savedBgDark = normalizeBackground(storedBgDark);
 
-  // The Founder background needs a verified Founding license. The saved preference is
-  // never rewritten: while locked the default is applied (and shown as selected in the
-  // picker), and the preference comes back with the license.
-  // While the status is unknown, the cached last-known flag stands in for it (read once per
-  // mount); once known, the real flag wins and refreshes the cache.
-  const flags = useLicenseFlags();
-  const [cachedFounder] = useState(readFounderPerkCache);
-  useEffect(() => {
-    if (flags.known) writeFounderPerkCache(flags.founderBackground);
-  }, [flags.known, flags.founderBackground]);
-  const bgLight = resolveBackground(savedBgLight, flags, SETTINGS_DEFAULTS.bgLight, cachedFounder);
-  const bgDark = resolveBackground(savedBgDark, flags, SETTINGS_DEFAULTS.bgDark, cachedFounder);
-  const founderUnlocked = flags.founderBackground;
-  const founderSaved =
-    flags.known &&
-    ((savedBgLight === FOUNDER_BACKGROUND.id && bgLight !== savedBgLight) ||
-      (savedBgDark === FOUNDER_BACKGROUND.id && bgDark !== savedBgDark));
+  const bgLight = savedBgLight;
+  const bgDark = savedBgDark;
 
   const systemLight = useSyncExternalStore(subscribeSystem, systemPrefersLight, () => false);
   const theme = preference === 'system' ? (systemLight ? 'light' : 'dark') : preference;
@@ -126,8 +107,6 @@ export function ThemeProvider({ children }) {
       bgDark,
       setBgLight,
       setBgDark,
-      founderUnlocked,
-      founderSaved,
     }),
     [
       theme,
@@ -137,8 +116,6 @@ export function ThemeProvider({ children }) {
       bgDark,
       setBgLight,
       setBgDark,
-      founderUnlocked,
-      founderSaved,
     ],
   );
 

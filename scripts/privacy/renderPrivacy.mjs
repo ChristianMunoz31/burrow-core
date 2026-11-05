@@ -161,13 +161,10 @@ ${features.map(featureCard).join('\n')}
 <p>Cloud AI is off by default. If you turn it on, Burrow sends prompts and the data Javi reads to the endpoint you chose, using your own API key, and only for the data categories you allow. Budget, todos, calendar, habits, bookmarks, countdowns and focus are on by default once cloud is enabled; health, notes, journal and the files of folders you add are off until you allow them. A few items have no data category, so those choices do not limit them: weather results that Javi looks up, and the advice Javi gives on the Settings page. They can be sent whenever cloud AI is on. You accept a consent screen first, and you pay the provider yourself. Saved API keys are stored encrypted on your computer and are not included in backups or exports.</p>
 
 <h2>Links that send nothing from Burrow</h2>
-<p>The Buy Burrow Pro button opens the seller's page in your default browser. The Report content link in Javi and the Help menu opens your default mail app with an empty message to <a href="${href}">${mail}</a>. Burrow itself sends nothing for these. If you send the email, your mail provider and we receive what you write.</p>
+<p>The Report content link in Javi and the Help menu opens your default mail app with an empty message to <a href="${href}">${mail}</a>. Burrow itself sends nothing for this. If you send the email, your mail provider and we receive what you write.</p>
 
 <h2>Microsoft Store</h2>
-<p>If you installed Burrow from the Microsoft Store, Microsoft may collect data about the install, purchase and updates under the <a href="${MS_PRIVACY}">Microsoft privacy statement</a>. Burrow does not receive that data. The Store edition delivers updates through the Store and makes no update request itself.</p>
-
-<h2>Purchases</h2>
-<p>Burrow Pro is sold by Gumroad or Lemon Squeezy, which handle checkout, tax and refunds under their own privacy policies. They hold your purchase details, not Burrow.</p>
+<p>If you installed Burrow from the Microsoft Store, Microsoft may collect data about the install, download and updates under the <a href="${MS_PRIVACY}">Microsoft privacy statement</a>. Burrow does not receive that data. The Store edition delivers updates through the Store and makes no update request itself.</p>
 
 <h2>Deleting your data</h2>
 <ul>
@@ -211,9 +208,9 @@ export function renderIndexPage(contact) {
  * @returns {Record<string, string>}
  */
 export function renderPages() {
-  const contact = readJson('config/store.json').supportContact
+  const contact = readJson('config/support.json').supportContact
   const privacy = readJson('config/privacy.json')
-  if (!isEmail(contact)) throw new Error('config/store.json supportContact is not an email address')
+  if (!isEmail(contact)) throw new Error('config/support.json supportContact is not an email address')
   if (typeof privacy.policyVersion !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(String(privacy.effectiveDate))) {
     throw new Error('config/privacy.json needs policyVersion and an effectiveDate like 2026-10-08')
   }

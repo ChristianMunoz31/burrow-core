@@ -1,4 +1,4 @@
-// Writes dist/burrow-build-info.json (docs/LICENSING.md section 6.2). Runs as `postbuild`, because
+// Writes dist/burrow-build-info.json (read by server/license/buildInfo.js). Runs as `postbuild`, because
 // `vite build` empties dist/ first. `--check` validates an existing file for the release workflow.
 // The file also records the channel (BURROW_CHANNEL: unset or stable, or dev). A dev build takes its version
 // from BURROW_DISPLAY_VERSION, which is required and must look like 0.2.0-dev.20261005.abc1234. The channel is

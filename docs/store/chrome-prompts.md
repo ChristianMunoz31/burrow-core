@@ -8,7 +8,7 @@ Before you start, read [../MICROSOFT_STORE.md](../MICROSOFT_STORE.md) "Before th
 
 ## 1. Pricing and availability
 
-Price Free, all markets, and the third-party in-app purchase declaration (Gumroad, policy 10.8.2) if the page has it.
+Price Free, all markets. Burrow is free for everyone (ADR 0002), so there are no in-app or third-party purchases to declare.
 
 ````text
 You are helping the owner fill in ONE section of a Microsoft Partner Center app submission.
@@ -26,7 +26,7 @@ SECTION: Pricing and availability.
 1. Price: Free. Do not set any price, sale or trial.
 2. Markets: leave all markets selected (all markets).
 3. Visibility and schedule: leave the defaults; do not set a publish date.
-4. If the page offers a way to declare in-app purchases or third-party purchases, declare them: Burrow Pro is sold by a third party (Gumroad, which is PCI DSS compliant) in the browser, outside the Store, as a one-time purchase; the app only opens the Gumroad page in the default browser. If the form has no such option, skip it and say so.
+4. If the page offers a way to declare in-app purchases or third-party purchases, declare none: Burrow is free for everyone and has no in-app purchases and no purchases through another seller. If the form has no such option, skip it and say so.
 5. Click Save draft. Do not click Submit.
 ````
 
@@ -51,7 +51,7 @@ SECTION: Properties.
 2. Privacy policy URL: https://christianmunoz31.github.io/burrow-releases/privacy/
    (This page is live. You may open it in a new tab to confirm it loads; do not change anything there.)
 3. Support contact info: burrowsupport@gmail.com (an email address is fine; if a URL is required, leave it empty and say so).
-4. Personal information handling: declare it per the privacy statement. Burrow collects no personal information: it has no accounts and no telemetry, and the developer receives no data. Data stays in a database on the user's own computer. It contacts the internet only when the user turns on or clicks an optional feature (weather, Oura, Google Sheets import, Ollama on another computer, a bring-your-own cloud AI key, license activation with Gumroad or Lemon Squeezy). The Microsoft Store collects its own data under Microsoft's terms. If the form asks whether the app accesses, collects or transmits personal information, answer in line with this, and list what you chose in your report.
+4. Personal information handling: declare it per the privacy statement. Burrow collects no personal information: it has no accounts and no telemetry, and the developer receives no data. Data stays in a database on the user's own computer. It contacts the internet only when the user turns on or clicks an optional feature (weather, Oura, Google Sheets import, Ollama on another computer, a bring-your-own cloud AI key). The Microsoft Store collects its own data under Microsoft's terms. If the form asks whether the app accesses, collects or transmits personal information, answer in line with this, and list what you chose in your report.
 5. System requirements note (use the notes or additional-requirements field if there is one): Windows 10 version 1903 or later, or Windows 11. Windows 10 requires Microsoft Edge WebView2, preinstalled on most PCs. The Javi assistant needs Ollama (free, installed separately from ollama.com) with a model such as llama3.2:3b; everything else works without it.
 6. Leave every other field at its current value. Click Save draft. Do not click Submit.
 ````
@@ -75,10 +75,10 @@ Rules, all mandatory:
 SECTION: Age ratings (IARC questionnaire). Do NOT reach the final confirmation.
 Facts to answer with. Read each question and map the facts to it honestly; do not invent answers and do not choose an answer only to lower the rating.
 - Burrow is a personal budget, journal and productivity app. It has no violence, sexual content, nudity, profanity, drugs, alcohol or gambling of its own, and no content from other users.
-- Generative AI: YES. The app contains generative AI (Javi, a language model run locally through Ollama). The user opens Javi to get a short insight about the current page; with Burrow Pro the user can also type follow-up questions and get a daily briefing, which Burrow can write on a schedule on this computer. Output is not pre-moderated by the developer and can be wrong or inappropriate. In-app reporting exists (Help > Report content... and the Report link under each Javi reply and under the briefing).
+- Generative AI: YES. The app contains generative AI (Javi, a language model run locally through Ollama). The user opens Javi to get a short insight about the current page; the user can also type follow-up questions and get a daily briefing, which Burrow can write on a schedule on this computer. Output is not pre-moderated by the developer and can be wrong or inappropriate. In-app reporting exists (Help > Report content... and the Report link under each Javi reply and under the briefing).
 - User-to-user communication: NO. No messaging, forums or sharing between users.
 - Sharing of location: NO.
-- Digital purchases: YES, external only. Burrow Pro is sold through Gumroad outside the Store; the app opens the Gumroad page in the browser.
+- Digital purchases: NO. Burrow is free for everyone: no in-app purchases and no purchases through another seller.
 - No accounts, no ads, no online play, no personal information collected by the developer.
 - Category: pick the one that fits a productivity or utility app (the nearest option if there is no exact match).
 Steps: start or continue the questionnaire, answer using only the facts above, and go through to the summary of results. STOP before any final confirmation, "Submit" or "Save" step that would lock in the ratings. Then report: every question you saw with the answer you chose and which fact it came from, the rating the questionnaire shows for each region, and any question you could not answer from these facts (list them for the owner). Do not click Submit.
@@ -120,12 +120,12 @@ Burrow is a private budget and journal tracker for your Windows PC. Your data st
 
 - One simple menu for your money and your days: transactions and subscriptions, todos, notes, focus sessions, countdowns, bookmarks and folders, your journal, habits, sleep and activity, a calendar, and the weather in the Javi card on Home.
 - Automatic daily local backups with one-click restore, plus an export of everything as open files (JSON, CSV and Markdown).
-- Javi, a built-in helper that gives a quick insight about the page you are on, shows a small count when there is something new to look at, and with Burrow Pro answers questions about your own data. All math (totals, averages, budgets) is calculated by Burrow, not by the model.
+- Javi, a built-in helper that gives a quick insight about the page you are on, shows a small count when there is something new to look at, and answers questions about your own data. All math (totals, averages, budgets) is calculated by Burrow, not by the model.
 - Privacy controls you can see: a Network activity page lists recent outbound connections Burrow has made (the last 90 days). Anything that contacts the internet is off until you turn it on.
 - Optional: bring your own cloud AI provider. It is off by default and asks for confirmation first.
 - Your data is never paywalled. Export, import, backups and privacy controls are free forever.
 
-Price: Burrow is free to download and includes a full 14-day trial of every Pro feature, with no card and no account. Burrow Pro is a one-time purchase sold through Gumroad, a third-party seller, not through the Store. It includes a year of new Pro features (two years for the Founding edition): the Pro features released during that year stay yours forever, and Pro features released after it need a newer Burrow Pro license. Everything in Burrow Free is unaffected. Prices range from $49 (Standard) to $99 (Founding edition, limited-time, on sale until January 5, 2027), with a Family edition for up to 5 people at $79. After you buy, paste the license key in Settings > License. Clicking "Buy Burrow Pro" opens the Gumroad page in your browser.
+Price: Burrow is free. Every feature is included, with no subscription and no purchases inside the app or through another seller.
 
 Windows 10 requires Microsoft Edge WebView2, preinstalled on most PCs.
 >>>
@@ -136,7 +136,7 @@ Your data stays on your computer: no account, no telemetry, nothing sent to the 
 Automatic daily backups with one-click restore, and export as JSON, CSV or Markdown
 Javi, a built-in helper on your computer (needs Ollama), gives a quick insight on each page and shows when there is something new
 Network activity page shows recent outbound connections (kept 90 days); anything that goes online is off until you turn it on
-Free to use; Burrow Pro is an optional one-time purchase through Gumroad
+Free for everyone: every feature included, no subscription, no purchases
 
 Search terms / keywords (one per row, at most 7):
 budget tracker
@@ -147,7 +147,7 @@ local first
 personal finance
 privacy
 
-What's new in this version (Burrow 1.2.0):
+What's new in this version (Burrow 1.2.0; historical text that mentions Burrow Pro as it was then. For the next submission replace it with text for that release: Burrow is free for everyone, so it never says Pro, trial or purchase):
 <<<
 New: one simple menu. Home is at the top, then your pages in three groups: Budget (Budget, Subscriptions), Productivity (Todos, Notes, Focus, Countdowns, Bookmarks, Folders) and Health (Journal, Habits, Sleep & activity), with Calendar at the bottom. The Work and Home filter is now on the Todos page, and your tags are kept.
 The Health page is now called Sleep & activity. It still shows the readiness, sleep and activity from your Oura Ring.

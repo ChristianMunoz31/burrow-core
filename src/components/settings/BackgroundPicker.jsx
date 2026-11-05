@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { Check } from 'lucide-react';
-import { BACKGROUND_PRESETS, FOUNDER_BACKGROUND } from '../../constants/settingsDefaults';
+import { BACKGROUND_PRESETS } from '../../constants/settingsDefaults';
 
 /**
  * Background preset picker: a native radio group (arrow keys work for free) where
@@ -9,24 +9,16 @@ import { BACKGROUND_PRESETS, FOUNDER_BACKGROUND } from '../../constants/settings
  * laid out at swatch scale, so they never drift from what is applied.
  *
  * Props: legend (e.g. "Dark mode background"), value (preset id),
- * onChange(presetId), name (optional radio group name), founderUnlocked (appends the
- * Founder preset; it stays hidden, not teased, while locked).
+ * onChange(presetId), name (optional radio group name).
  */
-export default function BackgroundPicker({
-  legend,
-  value,
-  onChange,
-  name,
-  founderUnlocked = false,
-}) {
+export default function BackgroundPicker({ legend, value, onChange, name }) {
   const autoName = useId();
   const groupName = name ?? autoName;
-  const presets = founderUnlocked ? [...BACKGROUND_PRESETS, FOUNDER_BACKGROUND] : BACKGROUND_PRESETS;
   return (
     <fieldset className="min-w-0">
       <legend className="mb-2 text-sm font-semibold text-slate-slate100">{legend}</legend>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {presets.map((preset) => {
+        {BACKGROUND_PRESETS.map((preset) => {
           const selected = value === preset.id;
           return (
             <label key={preset.id} className="block cursor-pointer">

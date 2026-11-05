@@ -31,8 +31,6 @@ for (const name of [
   'BURROW_CHANNEL',
   'BURROW_STABLE_DATA_DIR',
   'BURROW_DISPLAY_VERSION',
-  'BURROW_DEV_TIER',
-  'BURROW_DEV_TRIAL_DAYS',
 ]) {
   delete process.env[name];
 }

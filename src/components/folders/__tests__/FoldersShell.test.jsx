@@ -5,13 +5,9 @@ import '@testing-library/jest-dom/vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ToastProvider } from '../../../contexts/ToastContext';
-import { resetEntitlementsState } from '../../../test-utils/entitlements';
 import { __resetPullStoreForTests } from '../../../hooks/ollamaPullStore';
 import { LIMITS, apiError, folderView, jobView } from './folderFixtures';
 
-vi.mock('../../../hooks/useEntitlements', async () =>
-  (await import('../../../test-utils/entitlements.js')).entitlementsModule(),
-);
 // Poll the app's window fast so the tests do not wait a second per step.
 vi.mock('../../../constants/folders', async (importOriginal) => ({ ...(await importOriginal()), DIALOG_POLL_MS: 5 }));
 vi.mock('../../../services/foldersService', () => ({
@@ -36,11 +32,6 @@ vi.mock('../../../services/foldersService', () => ({
 }));
 vi.mock('../../../services/aiSettingsService', () => ({
   aiSettingsService: { pull: vi.fn(), setup: vi.fn(), get: vi.fn() },
-}));
-vi.mock('../../../services/licenseService', () => ({
-  licenseService: {
-    get: vi.fn(async () => ({ state: 'free', pro: false, trial: { state: 'ended' }, license: null, purchaseUrl: null })),
-  },
 }));
 
 import FoldersPage from '../FoldersPage';
@@ -99,7 +90,6 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  resetEntitlementsState();
   __resetPullStoreForTests();
 });
 

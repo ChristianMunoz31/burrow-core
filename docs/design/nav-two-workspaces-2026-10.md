@@ -1,5 +1,7 @@
 # Two workspaces in the menu, Calendar and Weather on one page (2026-10)
 
+> Note 2026-11-05: mentions of Pro and licensing below are history; they were removed by [ADR 0002](../adr/0002-free-for-everyone.md) (Burrow is free for everyone).
+
 > Superseded 2026-10-10 by docs/design/nav-sections-2026-10.md for the menu and workspaces: one menu with sections, no workspaces. Calendar & Weather as one page still stands.
 
 Owner request (2026-10-10, verbatim): "move journal/budget drop-down to hamburger nav button. merge weather and calendar into one page. rest of nav should only have budget and journal where journal takes over the rest of life pages."

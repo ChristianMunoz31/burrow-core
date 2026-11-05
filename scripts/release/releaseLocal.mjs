@@ -9,11 +9,13 @@
 // public key before the plan is shown. Signing env vars (TAURI_SIGNING_PRIVATE_KEY or TAURI_SIGNING_PRIVATE_KEY_PATH,
 // TAURI_SIGNING_PRIVATE_KEY_PASSWORD) reach the tauri build step only, never npm ci or any other child.
 //
-// Usage: npm run release:local -- [--tag vX.Y.Z] [--dry-run | --publish [--yes]] [--skip-build]
+// Usage: npm run release:local -- [--tag vX.Y.Z] [--dry-run | --publish [--yes]] [--skip-build] [--gumroad]
 //          [--x64-from-ci <run-id> | --x64-file <path>] [--out-dir <dir>]
 //   --dry-run          the DEFAULT. Checks, builds (unless --skip-build), prints the plan and the gh commands. No
 //                      network writes: it only reads from GitHub (tag, CI run, x64 download).
 //   --publish          really publish. Uses your gh sign-in (or RELEASES_TOKEN) and asks to confirm unless --yes.
+//   --gumroad          after a real publish, also update the Gumroad pages (dry run, then a write with its own prompt).
+//                      Off by default: Burrow is free for everyone, so the Gumroad listing is not part of a release.
 //   --skip-build       reuse the installers already in <out-dir>/public instead of building. With --publish it is
 //                      refused unless <out-dir>/build-manifest.json (written by a build here) matches HEAD, the
 //                      package version and the hash of every staged file.
@@ -76,7 +78,7 @@ const execFile = (file, args, opts = {}) => execFileRaw(file, args, { ...opts, e
 /**
  * @typedef {{
  *   tag: string | null, publish: boolean, dryRun: boolean, yes: boolean, skipBuild: boolean,
- *   x64FromCi: string | null, x64File: string | null, outDir: string | null, help: boolean,
+ *   x64FromCi: string | null, x64File: string | null, outDir: string | null, gumroad: boolean, help: boolean,
  * }} CliOptions
  */
 
@@ -97,6 +99,7 @@ export function parseCliArgs(argv) {
       'x64-from-ci': { type: 'string' },
       'x64-file': { type: 'string' },
       'out-dir': { type: 'string' },
+      gumroad: { type: 'boolean', default: false },
       help: { type: 'boolean', default: false },
     },
     strict: true,
@@ -118,6 +121,7 @@ export function parseCliArgs(argv) {
     x64FromCi: runId,
     x64File,
     outDir: values['out-dir'] ?? null,
+    gumroad: values.gumroad,
     help: values.help,
   };
 }
@@ -831,17 +835,19 @@ export async function runRelease(opts, deps = {}) {
   await publishFn({ ...common, dryRun: false, env: { ...env, GH_TOKEN: token } });
   log(`Published ${tag}.`);
 
-  // The version on the Gumroad pages comes from the same tag: preview first, then the write with its own prompt.
-  // A failure here never undoes the release; the owner is told the one command to run again.
-  const sync = { tag, yes: false, cli: null, backupDir: null, notesFrom: null, help: false };
-  const syncDeps = { env: withoutSigningEnv(env), root, log, confirm };
-  try {
-    log('Updating the Gumroad pages (dry run first).');
-    await gumroadFn({ ...sync, publish: false, dryRun: true }, syncDeps);
-    await gumroadFn({ ...sync, publish: true, dryRun: false }, syncDeps);
-  } catch (err) {
-    log(`Warning: the release is published, but the Gumroad pages were not updated: ${err instanceof Error ? err.message : String(err)}`);
-    log('Fix that, then run: npm run release:gumroad -- --publish');
+  // Optional (--gumroad): the version on the Gumroad pages comes from the same tag, preview first, then the write with
+  // its own prompt. A failure here never undoes the release; the owner is told the one command to run again.
+  if (opts.gumroad === true) {
+    const sync = { tag, yes: false, cli: null, backupDir: null, notesFrom: null, help: false };
+    const syncDeps = { env: withoutSigningEnv(env), root, log, confirm };
+    try {
+      log('Updating the Gumroad pages (dry run first).');
+      await gumroadFn({ ...sync, publish: false, dryRun: true }, syncDeps);
+      await gumroadFn({ ...sync, publish: true, dryRun: false }, syncDeps);
+    } catch (err) {
+      log(`Warning: the release is published, but the Gumroad pages were not updated: ${err instanceof Error ? err.message : String(err)}`);
+      log('Fix that, then run: npm run release:gumroad -- --publish');
+    }
   }
   // A hint only: installing over this PC's Burrow is a separate step the owner runs on purpose.
   const staged = path.join(publicDir, arch === 'x64' ? INSTALLER_X64 : INSTALLER_ARM64);

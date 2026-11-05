@@ -5,7 +5,7 @@ import { test, expect, useBurrow } from '../support/fixtures.js';
 import { FIXED_NOW, settleAndShoot } from '../support/visual.js';
 import { nav } from '../pages/nav.js';
 
-useBurrow({ seed: true, ollama: 'fake', fixedNow: FIXED_NOW, preseed: { trialEnded: true } });
+useBurrow({ seed: true, ollama: 'fake', fixedNow: FIXED_NOW });
 
 const SCREENS = [
   { name: 'home', url: '/', heading: 'Overview' },
@@ -36,8 +36,8 @@ for (const theme of ['light', 'dark']) {
       });
     }
 
-    // The open menu over /journal (Journal active) in its default state, fresh storage: Home, Budget and
-    // Productivity collapsed, Health expanded, the divider and Calendar. Shot over a page, so it
+    // The open menu over /journal (Journal active) in its default state, fresh storage: Home, Calendar, Financials and
+    // Productivity collapsed, Health expanded. Shot over a page, so it
     // never depends on Home cards.
     test('drawer-open', async ({ page }) => {
       await page.clock.install({ time: new Date(FIXED_NOW) });
@@ -45,7 +45,7 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByRole('heading', { level: 2, name: 'Journal', exact: true }).first()).toBeVisible();
       const n = nav(page);
       const list = await n.openDrawer();
-      await expect(n.sectionHeader('Budget')).toHaveAttribute('aria-expanded', 'false');
+      await expect(n.sectionHeader('Financials')).toHaveAttribute('aria-expanded', 'false');
       await expect(n.sectionHeader('Productivity')).toHaveAttribute('aria-expanded', 'false');
       await expect(n.sectionHeader('Health')).toHaveAttribute('aria-expanded', 'true');
       await expect(n.drawerSection('Health').getByRole('link', { name: 'Journal', exact: true })).toHaveAttribute(

@@ -93,7 +93,7 @@ function clipText(s, max) {
 
 const fail = (status, code, error) => ({ ok: false, status, code, error });
 
-/** Body or query keys that mean a follow-up or conversation; Free may not send them (fail closed). */
+/** Body or query keys that mean a follow-up or conversation (judged before validation, fail closed). */
 export const ADVICE_MULTI_TURN_KEYS = Object.freeze([
   'history',
   'threadId',
@@ -111,10 +111,10 @@ const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const isSet = (v) => v !== undefined && v !== null;
 
 /**
- * Whether an advice request is a follow-up or conversation (Pro) rather than the single page
- * insight (Free): a non-empty `messages` value of any type, a thread/history key in the body,
+ * Whether an advice request is a follow-up or conversation rather than the single page
+ * insight: a non-empty `messages` value of any type, a thread/history key in the body,
  * or `messages` or such a key in the query. Judged before validation, so a malformed
- * conversation is still a 403 for Free. A non-object body is not multi-turn (validation 400s).
+ * conversation is never cached or replayed. A non-object body is not multi-turn (validation 400s).
  * @param {{ body?: unknown, query?: unknown }} req
  * @returns {boolean}
  */

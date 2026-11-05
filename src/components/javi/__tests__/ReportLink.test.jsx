@@ -39,8 +39,8 @@ describe('ReportLink (policy 11.16)', () => {
     expect(reportContentHref.length).toBe(0);
   });
 
-  it('uses the support address from config/store.json', () => {
-    const store = JSON.parse(readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'config', 'store.json'), 'utf8'));
-    expect(REPORT_EMAIL).toBe(store.supportContact);
+  it('uses the support address from config/support.json', () => {
+    const support = JSON.parse(readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', 'config', 'support.json'), 'utf8'));
+    expect(REPORT_EMAIL).toBe(support.supportContact);
   });
 });

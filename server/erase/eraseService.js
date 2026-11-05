@@ -5,10 +5,10 @@
 //   2. one transaction with secure_delete ON: delete every user table, then write the audit marker
 //   3. right after the commit: wal_checkpoint(TRUNCATE), VACUUM, wal_checkpoint(TRUNCATE) (a checkpoint
 //      that reports busy counts as incomplete), so freed pages and the WAL hold no old text
-//   4. then each file step on its own, so one failure never skips the others: leftover data files, backups
-//      (opt-in), the license (opt-in, followed by one more compaction); any failure ends as erase_incomplete
-// secrets.key stays: it is the MAC key behind the trial, clock and activation records (a new key would
-// reset the trial), and no saved key remains for it to protect.
+//   4. then each file step on its own, so one failure never skips the others: leftover data files and backups
+//      (opt-in); any failure ends as erase_incomplete
+// Every table is emptied, including rows that older versions kept for licensing (legacy `license.*` keys and the
+// stored license key secret). secrets.key stays: no saved key remains for it to protect.
 import fs from 'node:fs';
 import path from 'node:path';
 import { AUDIT_TABLE, normalizeAuditEvent } from '../audit.js';
@@ -29,8 +29,7 @@ import {
   resolveDbPath,
   withTransaction,
 } from '../db/index.js';
-import { LICENSE_KEY_SECRET_NAME } from '../license/constants.js';
-import { removeLicense } from '../license/index.js';
+import { ACTIVATION_FILE_NAME, CLOCK_FILE_NAME, RETIRED_LICENSE_BACKUP, RETIRED_LICENSE_FILE, TRIAL_FILE_NAME } from '../license/constants.js';
 import { invalidateNetPolicyCache } from '../netPolicy.js';
 import { invalidateProfileCache } from '../profile.js';
 import { drainScheduledJobs, pauseScheduledJobs, resumeScheduledJobs } from '../scheduledJobGate.js';
@@ -38,13 +37,21 @@ import { invalidateSecrets } from '../secrets/index.js';
 
 export const DRAIN_TIMEOUT_MS = 5000;
 
-/** app_state keys the wipe never touches: the trial and clock records and the license activation. */
-export const KEPT_STATE_KEYS = Object.freeze(['license.trial', 'license.trialNotices', 'license.clock', 'license.activation']);
+/** Files older versions kept in the data folder for licensing. Nothing reads them any more; Erase removes them. */
+const LEGACY_LICENSE_FILES = Object.freeze([ACTIVATION_FILE_NAME, CLOCK_FILE_NAME, TRIAL_FILE_NAME, RETIRED_LICENSE_FILE, RETIRED_LICENSE_BACKUP]);
+
+/**
+ * The temp file an older version's atomic write left behind when the process was killed between writing and renaming:
+ * `.<legacy name>.<pid>.<8 hex>.tmp` next to the legacy file (the old server/license/store.js naming).
+ */
+const LEGACY_LICENSE_TEMP_RE = new RegExp(
+  String.raw`^\.(?:${[ACTIVATION_FILE_NAME, CLOCK_FILE_NAME, TRIAL_FILE_NAME].map((n) => n.replace(/\./g, String.raw`\.`)).join('|')})\.\d+\.[0-9a-f]{8}\.tmp$`,
+);
 
 /**
  * How the wipe treats each table. Every table in db/tables.js must be listed (eraseClassification.test.js
  * fails otherwise). A table missing here is still emptied at runtime: the safe default is to erase.
- * @type {Readonly<Record<string, 'erased' | 'erased_except_kept_rows'>>}
+ * @type {Readonly<Record<string, 'erased'>>}
  */
 export const TABLE_CLASS = Object.freeze({
   transactions: 'erased',
@@ -65,10 +72,10 @@ export const TABLE_CLASS = Object.freeze({
   folders: 'erased',
   folder_files: 'erased',
   folder_chunks: 'erased',
-  // Settings, profile, consent, onboarding and categories go; the trial, clock and activation rows stay.
-  app_state: 'erased_except_kept_rows',
-  // Saved API keys go; the stored license key (Lemon Squeezy "move to another computer") stays with the license.
-  app_secrets: 'erased_except_kept_rows',
+  // Settings, profile, consent, onboarding and categories, and any legacy license rows, go.
+  app_state: 'erased',
+  // Saved API keys go, and so does a legacy stored license key.
+  app_secrets: 'erased',
 });
 
 export const ERASE_MESSAGES = Object.freeze({
@@ -139,16 +146,11 @@ const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Pre-migration copies are named `<db file name>.pre-v<N>.bak` (server/db/migrate.js). */
 const preMigrationBackupRe = () => new RegExp(`^${escapeRegExp(path.basename(resolveDbPath()))}\\.pre-v\\d+\\.bak$`);
 
-// The activation row stays in the wipe even when the license is being removed: removeLicense() then writes
-// its cleared record over it, the same tamper-evident path as the normal Remove button.
-function wipeTables(db, { removeLicenseToo, now, hooks }) {
+function wipeTables(db, { now, hooks }) {
   const counts = { tables: 0, rows: 0, secrets: 0 };
   for (const table of tablesToErase()) {
-    if (table === 'app_state') {
-      counts.rows += removeAll(table, { keep: [...KEPT_STATE_KEYS], db });
-    } else if (table === 'app_secrets') {
-      // The license key row is not a user API key; without it a Lemon Squeezy license could not be moved later.
-      counts.secrets = removeAll(table, { keep: removeLicenseToo ? [] : [LICENSE_KEY_SECRET_NAME], db });
+    if (table === 'app_secrets') {
+      counts.secrets = removeAll(table, { db });
     } else {
       counts.rows += removeAll(table, { db });
     }
@@ -164,7 +166,6 @@ function wipeTables(db, { removeLicenseToo, now, hooks }) {
       tables: counts.tables,
       rows: counts.rows,
       keys_removed: counts.secrets,
-      remove_license: removeLicenseToo,
     },
   });
   if (!marker) throw new Error('audit marker rejected');
@@ -182,12 +183,13 @@ async function removeLeftovers({ dir, fsOps, deleteBackups }) {
   }
   const re = preMigrationBackupRe();
   for (const name of names) {
-    if (re.test(name)) await rmWithRetry(path.join(dir, name), { fsOps });
+    if (re.test(name) || LEGACY_LICENSE_TEMP_RE.test(name)) await rmWithRetry(path.join(dir, name), { fsOps });
     // A staged import from the direct Burrow (Store build, userprofile data location) holds a full copy of the old data and
     // would be swapped in at the next start: it goes too, with the pristine files an earlier import moved aside.
     if (STAGED_IMPORT_DIR_RE.test(name) || STAGED_IMPORT_DONE_RE.test(name)) await rmWithRetry(path.join(dir, name), { fsOps, recursive: true });
   }
   await rmWithRetry(path.join(dir, 'restore-aside'), { fsOps, recursive: true });
+  for (const file of LEGACY_LICENSE_FILES) await rmWithRetry(path.join(dir, file), { fsOps });
   await removeImportAside({ dir, fsOps, deleteBackups });
 }
 
@@ -273,16 +275,15 @@ function dropCaches() {
  * holds the lock: we answer at once instead of waiting, because an erase must never queue behind or
  * overlap a copy of the data, and a wait could outlast the request), restore_pending, erase_busy (requests
  * did not drain), erase_failed (rolled back, nothing erased) or erase_incomplete (committed, cleanup unfinished).
- * @param {{ removeLicense?: boolean, deleteBackups?: boolean, now?: () => Date, fsOps?: import('../backup/fsops.js').FsOps,
+ * @param {{ deleteBackups?: boolean, now?: () => Date, fsOps?: import('../backup/fsops.js').FsOps,
  *   hooks?: { afterWipe?: () => void, afterCommit?: () => void | Promise<void> }, drainTimeoutMs?: number,
  *   checkpoint?: (db: import('node:sqlite').DatabaseSync) => { busy?: number } | undefined }} [opts]
  *   hooks and checkpoint are test seams: they simulate a failure inside the transaction, a failure after the
  *   commit and a WAL checkpoint that reports busy
  * @returns {Promise<{ counts: { tables: number, rows: number, secrets: number, backups: number },
- *   licenseRemoved: boolean, backupsDeleted: boolean }>}
+ *   backupsDeleted: boolean }>}
  */
 export async function eraseAllData({
-  removeLicense: removeLicenseToo = false,
   deleteBackups = false,
   now = () => new Date(),
   fsOps = createFsOps(),
@@ -318,7 +319,7 @@ export async function eraseAllData({
       db = getDb();
       previousSecureDelete = Number(db.prepare('PRAGMA secure_delete').get()?.secure_delete ?? 0);
       db.exec('PRAGMA secure_delete = ON');
-      counts = withTransaction((handle) => wipeTables(handle, { removeLicenseToo, now: now(), hooks }), db);
+      counts = withTransaction((handle) => wipeTables(handle, { now: now(), hooks }), db);
       committed = true;
       // Anything that started before the wipe and finishes later drops its result.
       bumpDataGeneration();
@@ -352,21 +353,8 @@ export async function eraseAllData({
         backups = await removeBackupFiles({ fsOps });
       });
     }
-    if (removeLicenseToo) {
-      let removed = false;
-      await step('license', async () => {
-        await removeLicense();
-        removed = true;
-      });
-      // Removing the license rewrites its row: compact once more so the old row is not left in the WAL.
-      if (removed) {
-        await step('compact_after_license', () => {
-          if (!compact(db, checkpoint)) throw new Error('wal_checkpoint reported busy');
-        });
-      }
-    }
     if (failures.length > 0) throw new EraseError('erase_incomplete', { cause: failures[0].cause });
-    return { counts: { ...counts, backups }, licenseRemoved: removeLicenseToo, backupsDeleted: deleteBackups };
+    return { counts: { ...counts, backups }, backupsDeleted: deleteBackups };
   } finally {
     if (committed) dropCaches();
     if (db && previousSecureDelete !== null) {

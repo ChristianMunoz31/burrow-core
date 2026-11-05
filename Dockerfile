@@ -3,9 +3,9 @@
 #
 #   docker compose up --build        (see compose.yaml; needs APP_PASSWORD and AUTH_SECRET)
 #
-# Burrow Pro (docs/adr/0001-open-core-split.md 3.10, R4): when the private Pro repo is checked out at pro/, the image
+# Private module (docs/adr/0001-open-core-split.md 3.10, R4): when the private repo is checked out at pro/, the image
 # holds the Pro server SOURCE (the runtime is unbundled) and the Pro UI inside dist/. Such an image is internal only:
-# never push an image built with pro/ to any registry. Without pro/ this is a Free image.
+# never push an image built with pro/ to any registry. Without pro/ this is a core-only image.
 
 # Base image pinned by tag plus multi-arch index digest. The tag lets Dependabot's docker
 # ecosystem bump the digest within node:24-bookworm-slim (a bare digest made it track node:latest).
@@ -38,8 +38,8 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/.pro-runtime/ ./pro/
 RUN test ! -e pro/ui
 # The image never ships the developer tools (devtools/ is neither copied nor in the build context): fail the
-# build if one of their markers is in the runtime code or the UI, or the folder exists (docs/LICENSING.md 14.1).
-RUN ! grep -rqF -e "BURROW_DEV_TOOLS=on" -e "/dev/license" server.js server dist
+# build if one of their markers is in the runtime code or the UI, or the folder exists (docs/adr/0002-free-for-everyone.md decision 10c).
+RUN ! grep -rqF -e "BURROW_DEV_TOOLS=on" -e "/dev/status" server.js server dist
 RUN test ! -e devtools
 RUN mkdir -p /data && chown -R node:node /data
 USER node

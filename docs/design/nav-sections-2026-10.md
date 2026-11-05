@@ -1,5 +1,7 @@
 # One menu with sections, no workspaces (2026-10)
 
+> Note 2026-11-05: mentions of Pro, the trial and licensing below are history; they were removed by [ADR 0002](../adr/0002-free-for-everyone.md) (Burrow is free for everyone).
+
 > Updated 2026-10-10 (section 10): the sections are dropdowns (the current page's section open by default, toggles remembered on this device) and Home shows a dimmed, disabled Back. That supersedes "never collapsible" below.
 
 Base: `origin/main` 7d50829 (package 1.1.0; v1.2.0 not tagged, so workspaces never reached a released build). Merges IA proposals A (mental model), B (minimalism, drawer spec) and C (inventory, compatibility, split). Owner decisions are final and are not repeated as options. No Free or Pro change, no network call, no model call, no migration, no new route. Commit this file as `docs/design/nav-sections-2026-10.md` (design of record).

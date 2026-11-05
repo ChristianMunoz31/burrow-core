@@ -7,7 +7,6 @@ import { DatabaseSync } from 'node:sqlite';
 import { strFromU8, unzipSync } from 'fflate';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 
 import { count, getDb, insert, select } from '../db/index.js';

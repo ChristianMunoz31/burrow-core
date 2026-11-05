@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import SectionCard from '../shared/SectionCard';
 import { sectionProps } from './settingsSections';
@@ -6,15 +6,14 @@ import ResetControl from './ResetControl';
 import DisplayNameField from './DisplayNameField';
 import SwitchToggle from './SwitchToggle';
 import SegmentedRadio from './SegmentedRadio';
-import ProGateNotice from '../license/ProGateNotice';
 import { JAVI_CHARACTERS } from '../../constants/javiCharacters';
+import { PRO_UI_INCLUDED } from '../../extensions/proExtensions';
 
-// Butler is free; the other characters are a Pro perk (javi_characters). The server enforces it too.
-const FREE_CHARACTER = JAVI_CHARACTERS[0].id;
-const optionsFor = (locked) =>
-  JAVI_CHARACTERS.map(({ id, label }) => ({ value: id, label: locked && id !== FREE_CHARACTER ? `${label} (Pro)` : label }));
-const OPEN_OPTIONS = optionsFor(false);
-const LOCKED_OPTIONS = optionsFor(true);
+// Butler's text is core. Valet, Concierge and Majordomo live in the private module, so a build without it
+// offers Butler only (the server falls back to Butler for any other saved choice).
+const BUTLER = JAVI_CHARACTERS[0].id;
+const optionsFor = (moduleIncluded) =>
+  JAVI_CHARACTERS.filter(({ id }) => moduleIncluded || id === BUTLER).map(({ id, label }) => ({ value: id, label }));
 
 export default function GeneralSection({
   advisorButton = true,
@@ -23,7 +22,6 @@ export default function GeneralSection({
   onAutoAdviseChange,
   javiCharacter = 'butler',
   onJaviCharacterChange,
-  charactersLocked = false,
   navHideSubcategories = false,
   onNavHideSubcategoriesChange,
   onReset,
@@ -32,17 +30,8 @@ export default function GeneralSection({
   const buttonHintId = useId();
   const adviseLabelId = useId();
   const adviseHintId = useId();
-  const [proAttempt, setProAttempt] = useState(false);
-  const shown = charactersLocked ? FREE_CHARACTER : javiCharacter;
+  const shown = PRO_UI_INCLUDED ? javiCharacter : BUTLER;
   const character = JAVI_CHARACTERS.find((c) => c.id === shown) ?? JAVI_CHARACTERS[0];
-  const chooseCharacter = (id) => {
-    if (charactersLocked && id !== FREE_CHARACTER) {
-      setProAttempt(true);
-      return;
-    }
-    setProAttempt(false);
-    onJaviCharacterChange?.(id);
-  };
   const navHideLabelId = useId();
   const navHideHintId = useId();
   return (
@@ -92,13 +81,10 @@ export default function GeneralSection({
           <SegmentedRadio
             legend="Javi's character"
             value={character.id}
-            onChange={chooseCharacter}
-            options={charactersLocked ? LOCKED_OPTIONS : OPEN_OPTIONS}
-            hint={`${character.description} Same manners, different humor. Applies to the next insight.${
-              charactersLocked ? ' Valet, Concierge and Majordomo come with Burrow Pro.' : ''
-            }`}
+            onChange={onJaviCharacterChange}
+            options={optionsFor(PRO_UI_INCLUDED)}
+            hint={`${character.description} Same manners, different humor. Applies to the next insight.`}
           />
-          {charactersLocked && proAttempt && <ProGateNotice capability="javi_characters" className="mt-2" />}
         </div>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

@@ -15,7 +15,6 @@ import fetch from 'node-fetch';
 import { __resetNetPolicyForTests } from '../netPolicy.js';
 import { fetchOura, fetchWeather } from '../integrations.js';
 import { checkForUpdate, __resetUpdateCacheForTests } from '../updateCheck.js';
-import { postForm } from '../license/stores/storeHttp.js';
 import { manifest } from './helpers/updateManifest.js';
 import { NETWORK_COALESCE_MS, __resetNetworkCoalesceForTests, recordNetworkCall, statusFromHttp } from '../networkCall.js';
 import { __resetAiForTests } from '../ai/index.js';
@@ -30,7 +29,7 @@ const savedOptIn = process.env.BURROW_NETWORK_OPTIN;
 
 beforeAll(async () => {
   db = createTestDb();
-  process.env.BURROW_NETWORK_OPTIN = 'weather,oura,updates,license,sheets,aiLan';
+  process.env.BURROW_NETWORK_OPTIN = 'weather,oura,updates,sheets,aiLan';
   delete process.env.APP_PASSWORD;
   delete process.env.AUTH_SECRET;
   app = (await import('../../server.js')).default;
@@ -113,26 +112,6 @@ describe('outbound audit rows', () => {
     expect(metas.map((m) => [m.net_result, m.net_by])).toEqual([['started', 'app'], [undefined, undefined], [undefined, undefined]]);
     expect(metas.every((m) => m.net_host === 'github.com' && m.net_feature === 'updates')).toBe(true);
     expect(JSON.stringify(metas)).not.toContain('finished');
-  });
-
-  it('license: the store host only, by the shared result rule', async () => {
-    const url = 'https://api.gumroad.com/v2/licenses/verify';
-    const form = { license_key: 'AAAA-BBBB-CCCC-DDDD' };
-    for (const status of [200, 302, 404, 500]) {
-      await postForm({ url, form, fetchImpl: async () => json(status, { success: false }) });
-    }
-    await expect(
-      postForm({
-        url,
-        form,
-        fetchImpl: async () => {
-          throw new Error('offline');
-        },
-      }),
-    ).rejects.toThrow();
-    expect(netRows().map((r) => r.status)).toEqual(['ok', 'ok', 'error', 'error', 'error']);
-    expect(netRows().every((r) => r.net_feature === 'license' && r.net_host === 'api.gumroad.com')).toBe(true);
-    expect(JSON.stringify(netRows())).not.toContain('AAAA');
   });
 
   it('updates: 404, 5xx, a timeout and a thrown error are failures; a 200 is ok', async () => {

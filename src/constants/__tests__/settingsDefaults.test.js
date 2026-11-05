@@ -1,38 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import {
-  BACKGROUND_PRESET_IDS,
-  FOUNDER_BACKGROUND,
-  normalizeBackground,
-  resolveBackground,
-} from '../settingsDefaults';
+import * as defaults from '../settingsDefaults';
+import { BACKGROUND_PRESET_IDS, BACKGROUND_PRESETS, normalizeBackground } from '../settingsDefaults';
 
-describe('founder background', () => {
-  it('is not a regular preset but is a valid stored value', () => {
-    expect(BACKGROUND_PRESET_IDS).not.toContain('founder');
-    expect(FOUNDER_BACKGROUND.id).toBe('founder');
+describe('purple and gold background (id founder)', () => {
+  it('is a regular preset for everyone, with no founding wording', () => {
+    expect(BACKGROUND_PRESET_IDS).toContain('founder');
+    const preset = BACKGROUND_PRESETS.find((p) => p.id === 'founder');
+    expect(preset.label).toBe('Purple and gold');
+    expect(`${preset.label} ${preset.description}`).not.toMatch(/founding|member|licen[sc]e|pro\b/i);
+  });
+
+  it('keeps a saved founder value valid and normalizes the rest as before', () => {
     expect(normalizeBackground('founder')).toBe('founder');
     expect(normalizeBackground('ocean')).toBe('ocean');
     expect(normalizeBackground('nope')).toBe('aurora');
   });
 
-  it.each([
-    ['founder', { known: true, founderBackground: true }, false, 'founder'],
-    ['founder', { known: true, founderBackground: false }, false, 'aurora'],
-    // The real flag wins over the cache once known.
-    ['founder', { known: true, founderBackground: false }, true, 'aurora'],
-    ['founder', { known: true, founderBackground: true }, false, 'founder'],
-    // Unknown status: the cached last-known flag decides, no cache means the default.
-    ['founder', { known: false, founderBackground: false }, false, 'aurora'],
-    ['founder', { known: false, founderBackground: false }, true, 'founder'],
-    ['ocean', { known: true, founderBackground: false }, false, 'ocean'],
-    ['ocean', { known: false, founderBackground: false }, false, 'ocean'],
-  ])('resolveBackground(%s, %o, cached=%s) = %s', (pref, flags, cached, expected) => {
-    expect(resolveBackground(pref, flags, 'aurora', cached)).toBe(expected);
-  });
-
-  it('treats a missing cache argument as not cached', () => {
-    expect(resolveBackground('founder', { known: false, founderBackground: false }, 'aurora')).toBe(
-      'aurora',
-    );
+  it('has no perk gate left', () => {
+    expect(defaults.resolveBackground).toBeUndefined();
+    expect(defaults.FOUNDER_BACKGROUND).toBeUndefined();
   });
 });

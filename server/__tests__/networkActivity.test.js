@@ -127,6 +127,20 @@ describe('GET /api/privacy/network-activity', () => {
     ]);
   });
 
+  it('keeps the rows of the retired license check visible with a plain label, and still hides other unknown ids', async () => {
+    insertMany(
+      'audit_log',
+      [
+        row(1, { meta: { net_feature: 'license', net_host: 'api.gumroad.com' } }),
+        row(2, { meta: { net_feature: 'constructor', net_host: 'api.gumroad.com' } }),
+        row(3, { meta: { net_feature: 'nonsense', net_host: 'api.gumroad.com' } }),
+      ],
+      { db },
+    );
+    const { entries } = (await get()).body.data;
+    expect(entries.map((e) => [e.feature, e.label, e.host, e.result])).toEqual([['license', 'Activation check (older version)', 'api.gumroad.com', 'ok']]);
+  });
+
   it('reports a blocked result when the row says so', async () => {
     insertMany('audit_log', [row(1, { status: 'error', meta: { net_feature: 'updates', net_host: 'api.github.com', result: 'blocked' } })], { db });
     expect((await get()).body.data.entries[0].result).toBe('blocked');
@@ -259,8 +273,8 @@ describe('recordNetworkCall', () => {
   });
 
   it('shows up in the list as a failed connection when it errored', async () => {
-    await recordNetworkCall('license', 'https://api.gumroad.com/v2/licenses/verify', 'error');
+    await recordNetworkCall('oura', 'https://api.ouraring.com/v2/usercollection/sleep', 'error');
     const { entries } = listNetworkActivity({ db });
-    expect(entries.map((e) => [e.label, e.host, e.result])).toEqual([['License', 'api.gumroad.com', 'failed']]);
+    expect(entries.map((e) => [e.label, e.host, e.result])).toEqual([['Oura Ring', 'api.ouraring.com', 'failed']]);
   });
 });

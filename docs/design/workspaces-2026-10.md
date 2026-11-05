@@ -1,5 +1,7 @@
 # Budget and Journal workspaces (2026-10)
 
+> Note 2026-11-05: mentions of Pro, the trial and licensing below are history; they were removed by [ADR 0002](../adr/0002-free-for-everyone.md) (Burrow is free for everyone).
+
 > Superseded 2026-10-10 by docs/design/nav-sections-2026-10.md: Burrow has no workspaces. The Todos-only Work / Home filter still stands.
 
 **Implementation status:** implemented on `feat/workspaces`; see "Implementation outcome" at the end for what shipped. Two parts of this design did not ship in this PR and live on follow-up branches: the Budget summary card (section 1.2, `feat/home-budget-card`) and the shared calculator (section 6.5, `feat/calculator`). Read those sections as the design for the follow-ups, not as shipped behaviour.

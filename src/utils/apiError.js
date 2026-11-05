@@ -5,9 +5,8 @@
 // `reason` is the finer cause: ai_disabled, no_model, no_tool_model, network_opt_in_required,
 // ollama_unavailable. The UI keys "AI is turned off" off reason ai_disabled, never the text.
 //   429 { error: 'ai_busy', message }                          (too many queued AI requests)
-//   403 { error: 'pro_required', feature, message }            (a Pro capability without Pro)
 //   409 { error: 'conversation_busy', message }                (another Javi run is active in this chat)
-//   501 { error: 'pro_not_included', code, feature, message }  (Pro entitlement, but this build has no Pro module)
+//   501 { error: 'pro_not_included', code, feature, message }  (this build does not include the private module)
 // `message` is the human text. A bare `error` string is only shown when it is a known code with
 // friendly copy below; raw `error` strings are never rendered.
 
@@ -15,9 +14,7 @@ export const NETWORK_OPT_IN_REQUIRED = 'network_opt_in_required';
 export const AI_NOT_CONFIGURED = 'ai_not_configured';
 export const OLLAMA_UNAVAILABLE = 'ollama_unavailable';
 export const AI_BUSY = 'ai_busy';
-/** 403 { error: 'pro_required', feature, message }: the capability needs Burrow Pro. */
-export const PRO_REQUIRED = 'pro_required';
-/** 501 { error: 'pro_not_included', code, feature, message }: Pro is allowed, but this build has no Pro module. */
+/** 501 { error: 'pro_not_included', code, feature, message }: this build does not include the private module. */
 export const PRO_NOT_INCLUDED = 'pro_not_included';
 /** Status/503 reason when the server runs with BURROW_AI=0. */
 export const AI_DISABLED = 'ai_disabled';
@@ -28,7 +25,6 @@ const STRUCTURED_CODES = new Set([
   AI_NOT_CONFIGURED,
   OLLAMA_UNAVAILABLE,
   AI_BUSY,
-  PRO_REQUIRED,
   PRO_NOT_INCLUDED,
 ]);
 
@@ -97,8 +93,5 @@ export const isNetworkOptInError = (err) => err?.code === NETWORK_OPT_IN_REQUIRE
 export const isAiUnavailableError = (err) =>
   err?.code === AI_NOT_CONFIGURED || err?.code === OLLAMA_UNAVAILABLE;
 
-/** True when the server refused because the capability needs Burrow Pro. */
-export const isProRequiredError = (err) => err?.code === PRO_REQUIRED;
-
-/** True when the server answered 501 pro_not_included: the build does not include the Pro module. */
+/** True when the server answered 501 pro_not_included: the build does not include the private module. */
 export const isProNotIncludedError = (err) => err?.code === PRO_NOT_INCLUDED;

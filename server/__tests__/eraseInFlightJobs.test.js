@@ -4,7 +4,6 @@ import express from 'express';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Pro is on for this file (the Pro gate itself is covered in proGating.test.js).
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 vi.mock('../../loadEnv.js', () => ({}));
 vi.mock('node-fetch', () => ({ default: vi.fn() }));
 vi.mock('../dataAccess.js', async (orig) => {
@@ -21,7 +20,6 @@ import { __resetLockForTests } from '../backup/lock.js';
 import { clearOverviewCache, registerDataBrowserRoutes } from '../dataBrowserRoutes.js';
 import * as dataAccess from '../dataAccess.js';
 import { eraseAllData } from '../erase/eraseService.js';
-import { resetLicenseForTests } from '../license/index.js';
 import { stopScheduler } from '../scheduler.js';
 import { cleanupBackupEnv } from './helpers/backupEnv.js';
 import { freshDb, seedEverything } from './helpers/eraseEnv.js';
@@ -36,7 +34,6 @@ beforeEach(() => {
 afterEach(() => {
   stopScheduler();
   __resetLockForTests();
-  resetLicenseForTests();
   cleanupBackupEnv();
   vi.restoreAllMocks();
   dataAccess.appendMessage.mockClear();

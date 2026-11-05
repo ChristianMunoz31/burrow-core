@@ -1,4 +1,4 @@
-// Build date of this artifact (docs/LICENSING.md section 6). Read once at init, never from the user's clock.
+// Build date of this artifact. Read once at init, never from the user's clock.
 /* global __BURROW_BUILD_DATE__ */
 import fs from 'node:fs';
 import path from 'node:path';

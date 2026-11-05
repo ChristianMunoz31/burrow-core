@@ -3,7 +3,6 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from '../contexts/ToastContext';
 import { useAppInfo } from '../hooks/useAppInfo';
 import { useSyncedSetting } from '../hooks/useSyncedSetting';
-import { isFreeUi, useEntitlements } from '../hooks/useEntitlements';
 import {
   SETTINGS_DEFAULTS,
   SETTINGS_KEYS,
@@ -26,14 +25,12 @@ import NetworkSection from '../components/settings/NetworkSection';
 import ApiKeysSection from '../components/settings/ApiKeysSection';
 import ResetControl from '../components/settings/ResetControl';
 import SettingsLayout from '../components/settings/SettingsLayout';
-import LicenseSection from '../components/settings/LicenseSection';
 import UpdatesSection from '../components/settings/UpdatesSection';
 import { SETTINGS_EXTENSIONS } from '../extensions/settingsExtensions';
 import BuildIdentityLine from '../components/settings/BuildIdentityLine';
 
 export default function Settings() {
   const toast = useToast();
-  const entitlements = useEntitlements();
   const { info } = useAppInfo();
   const { theme, preference, setPreference, bgDark, bgLight, setBgDark, setBgLight } = useTheme();
   const [storedView, setView] = useSyncedSetting(
@@ -153,7 +150,6 @@ export default function Settings() {
           onAutoAdviseChange={withSave(setAutoAdvise)}
           javiCharacter={javiCharacter}
           onJaviCharacterChange={withSave(setJaviCharacter)}
-          charactersLocked={isFreeUi(entitlements, 'javi_characters')}
           navHideSubcategories={navHideSubcategories}
           onNavHideSubcategoriesChange={withSave(setNavHideSubcategories)}
           onReset={done('General', resetGeneral)}
@@ -163,7 +159,6 @@ export default function Settings() {
         <PrivacyActivitySection />
         <NetworkSection />
         <ApiKeysSection />
-        <LicenseSection />
         <UpdatesSection />
         {SETTINGS_EXTENSIONS.filter((e) => e.enabled(info) === true).map(({ id, Component }) => (
           <Suspense key={id} fallback={null}>

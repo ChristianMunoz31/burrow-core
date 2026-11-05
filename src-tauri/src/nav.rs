@@ -69,7 +69,7 @@ pub fn classify(url: &Url, port: u16) -> NavDecision {
             }
         }
         // A mailto link sends nothing from Burrow: it only hands a draft to the default mail app, like the
-        // Buy Burrow Pro button and Help > Report content (policy 11.16). The user sends it, or not.
+        // Help > Report content (policy 11.16). The user sends it, or not.
         "mailto" => NavDecision::External,
         _ => NavDecision::Deny,
     }

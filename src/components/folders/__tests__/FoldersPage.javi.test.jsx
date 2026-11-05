@@ -8,7 +8,6 @@ import { LIMITS, folderView } from './folderFixtures';
 
 // The Folders page side of Javi's inbox: /folders?folder=<uuid> focuses that card, and a rendered summary
 // marks the folders item read (javi:inbox-read), never on #add-folder or an empty list.
-vi.mock('../../../hooks/useEntitlements', async () => (await import('../../../test-utils/entitlements.js')).entitlementsModule());
 vi.mock('../../../services/foldersService', () => ({
   foldersService: {
     list: vi.fn(),
@@ -25,9 +24,6 @@ vi.mock('../../../services/foldersService', () => ({
   },
 }));
 vi.mock('../../../services/aiSettingsService', () => ({ aiSettingsService: { pull: vi.fn(), setup: vi.fn(), get: vi.fn() } }));
-vi.mock('../../../services/licenseService', () => ({
-  licenseService: { get: vi.fn(async () => ({ state: 'free', pro: false, trial: { state: 'ended' }, license: null, purchaseUrl: null })) },
-}));
 
 import FoldersPage from '../FoldersPage';
 import { foldersService } from '../../../services/foldersService';

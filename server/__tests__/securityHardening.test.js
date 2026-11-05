@@ -5,7 +5,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 // Pro is on for this file (the Pro gate itself is covered in proGating.test.js).
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import { DatabaseSync } from 'node:sqlite';
 import request from 'supertest';
 import { strToU8, zipSync } from 'fflate';

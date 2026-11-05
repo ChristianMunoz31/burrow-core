@@ -3,7 +3,6 @@
 // only. The Pro cases (the question index and ask stay local, a scheduled re-scan never uses cloud) are in cloudFolders.pro.test.js.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 // Pro is on for this file (the gate itself is covered in proTierMatrix.test.js).
-vi.mock('../license/index.js', async (importOriginal) => (await import('./helpers/pro.js')).mockLicenseModule(importOriginal));
 import request from 'supertest';
 
 vi.mock('../../loadEnv.js', () => ({}));

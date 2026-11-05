@@ -29,8 +29,6 @@ export const ALWAYS_RUN = [
   'server/__tests__/migrationSafety.test.js',
   'server/__tests__/checksScripts.test.js',
   'server/__tests__/ciPipeline.test.js',
-  'server/__tests__/license/noPrivateKeys.test.js',
-  'server/__tests__/license/scripts.test.js',
 ]
 
 // pro/ is the optional nested Pro repo (present only where it is checked out; CI runs without it).

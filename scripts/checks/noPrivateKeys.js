@@ -9,11 +9,8 @@ import { listStagedFiles, listTrackedFiles, readStaged, readWorking } from './gi
 
 const SKIP_EXT = /\.(svg|png|jpe?g|gif|webp|ico|icns|woff2?|ttf|otf|eot|zip|gz|pdf|db|sqlite|bak|mp3|mp4|wasm)$/i
 
-// Excluded by exact path: this file and its test, which spell the pattern out.
-export const EXCLUDED_FILES = new Set([
-  'scripts/checks/noPrivateKeys.js',
-  'server/__tests__/license/noPrivateKeys.test.js',
-])
+// Excluded by exact path: this file, which spells the pattern out.
+export const EXCLUDED_FILES = new Set(['scripts/checks/noPrivateKeys.js'])
 
 // "untrusted comment: <tool> [encrypted] secret key" is the first line of a minisign or rsign secret key file, which is
 // what `tauri signer generate` writes (base64 encoded as a whole, so its base64 form starts the file).

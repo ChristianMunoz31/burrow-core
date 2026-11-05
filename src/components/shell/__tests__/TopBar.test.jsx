@@ -16,7 +16,7 @@ vi.mock('../../../services/stateService', () => ({
   },
 }));
 
-// The bar itself no longer reads the profile; TrialBadge and the drawer test below still may.
+// The bar itself no longer reads the profile; the drawer test below still may.
 const profile = vi.hoisted(() => ({ displayName: null }));
 vi.mock('../../../hooks/useProfile', () => ({
   useProfile: () => ({ displayName: profile.displayName, onboarded: true, isLoading: false, save: vi.fn() }),

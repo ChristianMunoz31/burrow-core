@@ -33,7 +33,6 @@ const SECTION_KEYWORDS = {
   privacy: 'privacy activity audit log',
   network: 'network internet updates weather opt in',
   'api-keys': 'api keys connected services oura sheets',
-  license: 'license pro key activate',
 };
 
 // Text the palette searches for a command: its label plus any keywords.

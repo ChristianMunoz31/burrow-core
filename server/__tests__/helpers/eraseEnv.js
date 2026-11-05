@@ -1,13 +1,19 @@
 // Shared setup for the erase-all-data tests: a file-backed database in the per-file temp data dir
-// seeded with one row in every table, plus a real trial, clock and activation record.
+// seeded with one row in every table, plus the legacy license rows and files that older versions left behind.
 import fs from 'node:fs';
 import path from 'node:path';
 import '../../audit.js';
 import { TABLES, count, getDb, insert, select, upsert } from '../../db/index.js';
-import { createActivationStore } from '../../license/activationStore.js';
-import { getLicenseStatus, initLicense, resetLicenseForTests } from '../../license/index.js';
-import { createTrialStore } from '../../license/trialStore.js';
-import { LICENSE_KEY_SECRET_NAME } from '../../license/constants.js';
+import {
+  ACTIVATION_FILE_NAME,
+  ACTIVATION_STATE_KEY,
+  CLOCK_FILE_NAME,
+  CLOCK_STATE_KEY,
+  LICENSE_KEY_SECRET_NAME,
+  TRIAL_FILE_NAME,
+  TRIAL_NOTICES_STATE_KEY,
+  TRIAL_STATE_KEY,
+} from '../../license/constants.js';
 import { resetBackupEnv, dataDir } from './backupEnv.js';
 import { seedDb } from './testDb.js';
 
@@ -36,18 +42,20 @@ export function moduleRows() {
   };
 }
 
+/** Legacy license files that older versions kept in the data folder (nothing reads them now). */
+export const LEGACY_LICENSE_FILES = Object.freeze([ACTIVATION_FILE_NAME, CLOCK_FILE_NAME, TRIAL_FILE_NAME]);
+
 /** Fresh data dir and a migrated live database. */
 export function freshDb() {
-  resetLicenseForTests();
   return resetBackupEnv();
 }
 
 /**
- * Puts a row in every table, a saved API key, a license key secret, profile, consent, categories,
- * onboarding, a started trial and (optionally) a license activation.
+ * Puts a row in every table, a saved API key, a legacy license key secret, profile, consent, categories,
+ * onboarding, and the legacy license rows and files that older versions left behind.
  * @returns {{ db: import('node:sqlite').DatabaseSync, dir: string }}
  */
-export function seedEverything({ activation = true } = {}) {
+export function seedEverything() {
   const db = getDb();
   const dir = dataDir();
   const rows = seedDb(db, moduleRows());
@@ -77,28 +85,12 @@ export function seedEverything({ activation = true } = {}) {
       { conflict: ['name'], db },
     );
   }
-  const store = createActivationStore({ dataDir: dir, getDb: () => db });
-  if (activation) {
-    store.save({
-      store: 'gumroad',
-      productId: 'prod_test_123',
-      variantId: null,
-      edition: 'standard',
-      purchaseDate: '2026-10-05T12:00:00Z',
-      updatesUntil: '2027-10-05T12:00:00Z',
-      expiresAt: null,
-      activatedAt: '2026-10-05T12:00:00Z',
-      keyHash: 'A'.repeat(43),
-      keyLast4: '3333',
-      email: null,
-      instanceId: null,
-      test: false,
-    });
+  for (const key of [ACTIVATION_STATE_KEY, CLOCK_STATE_KEY, TRIAL_STATE_KEY, TRIAL_NOTICES_STATE_KEY]) {
+    upsert('app_state', { key, value: { legacy: true } }, { conflict: ['key'], db });
   }
-  // A trial record next to the activation: a license holder who also used the trial earlier.
-  createTrialStore({ dataDir: dir, getDb: () => db }).start(Date.parse(STAMP));
-  initLicense({ dataDir: dir, env: {}, getDb: () => db, allowTest: false, log: () => {} });
-  getLicenseStatus();
+  // The encryption key of saved API keys: Erase keeps it.
+  fs.writeFileSync(path.join(dir, 'secrets.key'), 'a'.repeat(64));
+  for (const file of LEGACY_LICENSE_FILES) fs.writeFileSync(path.join(dir, file), JSON.stringify({ legacy: true }));
   return { db, dir };
 }
 

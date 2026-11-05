@@ -53,7 +53,6 @@ function setup(over = {}) {
     recordNetworkCall: vi.fn(async () => {
       order.push('audit');
     }),
-    licenseStatus: vi.fn(() => ({ proSource: null })),
     now: vi.fn(() => 1_000_000),
     limiter: passLimiter,
     ...over,
@@ -431,52 +430,18 @@ describe('rate limit', () => {
   });
 });
 
-describe('license gate (install)', () => {
-  const paid = (updatesUntil) => () => ({ proSource: 'license', license: { updatesUntil } });
+describe('no license gate (install)', () => {
   const released = (publishedAt) => vi.fn(async () => available({ publishedAt }));
 
   it.each([
-    ['a release after the license window', paid('2030-01-01T00:00:00Z'), '2030-06-01T00:00:00Z'],
-    ['an unreadable release date', paid('2030-01-01T00:00:00Z'), null],
-    ['an unreadable updatesUntil', paid('soon'), '2030-06-01T00:00:00Z'],
-    [
-      'a license state that throws',
-      () => {
-        throw new Error('not initialised');
-      },
-      '2030-06-01T00:00:00Z',
-    ],
-  ])('409s update_license_window for %s, before the backup and the handoff', async (_label, licenseStatus, publishedAt) => {
-    const { app, deps } = setup({ licenseStatus, checkForUpdate: released(publishedAt) });
+    ['a release of any date', '2030-06-01T00:00:00Z'],
+    ['an unreadable release date', null],
+  ])('hands off for %s: no update_license_window, one backup, one handoff', async (_label, publishedAt) => {
+    const { app, deps } = setup({ checkForUpdate: released(publishedAt) });
     const res = await post(app);
-    expect(res.status).toBe(409);
-    expect(res.body).toEqual({
-      error: 'update_license_window',
-      code: 'update_license_window',
-      message:
-        "This update came out after your license's updates ended, so Pro would be off in it. Nothing was downloaded. Keep this version to keep Pro.",
-    });
-    expect(deps.createBackup).not.toHaveBeenCalled();
-    expect(deps.requestShellUpdate).not.toHaveBeenCalled();
-    expect(deps.recordNetworkCall).not.toHaveBeenCalled();
-  });
-
-  it('a refused request frees the lease', async () => {
-    let licenseStatus = paid('2030-01-01T00:00:00Z');
-    const { app } = setup({ licenseStatus: () => licenseStatus(), checkForUpdate: released('2030-06-01T00:00:00Z') });
-    expect((await post(app)).status).toBe(409);
-    licenseStatus = paid('2031-01-01T00:00:00Z');
-    expect((await post(app)).status).toBe(202);
-  });
-
-  it.each([
-    ['a license that covers the release', paid('2031-01-01T00:00:00Z')],
-    ['a release published at the instant the window ends', paid('2030-06-01T00:00:00Z')],
-    ['the trial', () => ({ proSource: 'local_trial', license: { updatesUntil: '2030-01-01T00:00:00Z' } })],
-    ['a lapsed or missing license', () => ({ proSource: null, license: null })],
-  ])('hands off for %s', async (_label, licenseStatus) => {
-    const { app, deps } = setup({ licenseStatus, checkForUpdate: released('2030-06-01T00:00:00Z') });
-    expect((await post(app)).status).toBe(202);
+    expect(res.status).toBe(202);
+    expect(res.body.code).not.toBe('update_license_window');
+    expect(deps.createBackup).toHaveBeenCalledTimes(1);
     expect(deps.requestShellUpdate).toHaveBeenCalledWith('1.2.0');
   });
 });
@@ -494,7 +459,6 @@ function setupManual(over = {}) {
       order.push('check');
       return available({ publishedAt: '2030-01-01T00:00:00Z' });
     }),
-    licenseStatus: vi.fn(() => ({ proSource: null })),
     fetchInstallerChecksum: vi.fn(async () => {
       order.push('checksum');
       return { ok: true, sha256: SHA };
@@ -553,16 +517,6 @@ describe('manual download: success', () => {
   it('uses a null backup id when the backup result has none', async () => {
     const { app } = setupManual({ createBackup: vi.fn(async () => ({ created: true })) });
     expect((await postManual(app)).body.data.backupId).toBeNull();
-  });
-
-  it('allows a license that covers the release and the trial', async () => {
-    for (const licenseStatus of [
-      () => ({ proSource: 'license', license: { updatesUntil: '2031-01-01T00:00:00Z' } }),
-      () => ({ proSource: 'local_trial', license: null }),
-    ]) {
-      const { app } = setupManual({ licenseStatus });
-      expect((await postManual(app)).status).toBe(200);
-    }
   });
 });
 
@@ -689,7 +643,7 @@ describe('manual download: refusals before any work', () => {
   });
 });
 
-describe('manual download: fresh check, license and checksum', () => {
+describe('manual download: fresh check and checksum', () => {
   it('503s update_check_unavailable when GitHub cannot be reached, and when the check throws', async () => {
     for (const check of [
       vi.fn(async () => ({ status: 'unavailable', reason: 'network', current: '1.0.0', channel: 'stable' })),
@@ -715,24 +669,6 @@ describe('manual download: fresh check, license and checksum', () => {
     const res = await postManual(app);
     expect(res.status).toBe(409);
     expect(res.body.code).toBe('update_not_available');
-    expect(deps.fetchInstallerChecksum).not.toHaveBeenCalled();
-    expect(deps.createBackup).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ['a release after the license window', () => ({ proSource: 'license', license: { updatesUntil: '2029-01-01T00:00:00Z' } })],
-    ['an unreadable updatesUntil', () => ({ proSource: 'license', license: { updatesUntil: 'soon' } })],
-    [
-      'a license state that throws',
-      () => {
-        throw new Error('not initialised');
-      },
-    ],
-  ])('409s update_license_window for %s, before the checksum request and the backup', async (_label, licenseStatus) => {
-    const { app, deps } = setupManual({ licenseStatus });
-    const res = await postManual(app);
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe('update_license_window');
     expect(deps.fetchInstallerChecksum).not.toHaveBeenCalled();
     expect(deps.createBackup).not.toHaveBeenCalled();
   });
@@ -789,7 +725,7 @@ describe('manual download: backup', () => {
 });
 
 describe('manual download: backup reuse', () => {
-  it('reuses the backup for the same version for 10 minutes, still re-checking license and checksum each time', async () => {
+  it('reuses the backup for the same version for 10 minutes, still re-checking the update and the checksum each time', async () => {
     let t = 1_000_000;
     const { app, deps } = setupManual({ now: () => t });
     const first = await postManual(app);
@@ -799,7 +735,6 @@ describe('manual download: backup reuse', () => {
     expect(second.body.data.backupId).toBe(first.body.data.backupId);
     expect(deps.createBackup).toHaveBeenCalledTimes(1);
     expect(deps.checkForUpdate).toHaveBeenCalledTimes(2);
-    expect(deps.licenseStatus).toHaveBeenCalledTimes(2);
     expect(deps.fetchInstallerChecksum).toHaveBeenCalledTimes(2);
     t += 2 * 60 * 1000;
     await postManual(app);
@@ -823,15 +758,5 @@ describe('manual download: backup reuse', () => {
     expect((await postManual(failing.app)).status).toBe(500);
     expect((await postManual(failing.app)).body.data.backupId).toBe('m2');
     expect(failing.deps.createBackup).toHaveBeenCalledTimes(2);
-  });
-
-  it('still applies the license gate to a repeat click', async () => {
-    const { app, deps } = setupManual();
-    await postManual(app);
-    deps.licenseStatus.mockReturnValue({ proSource: 'license', license: { updatesUntil: '2020-01-01T00:00:00Z' } });
-    const res = await postManual(app);
-    expect(res.status).toBe(409);
-    expect(res.body.code).toBe('update_license_window');
-    expect(deps.createBackup).toHaveBeenCalledTimes(1);
   });
 });

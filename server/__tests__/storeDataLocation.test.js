@@ -157,7 +157,8 @@ describe('output names say which package it is', () => {
     expect(msixName({ version: '1.0.0', arch: 'x64', dataLocation: 'userprofile' })).toBe('Burrow_1.0.0_userprofile_x64.msix');
     expect(bundleName({ version: '1.0.0' })).toBe('Burrow_1.0.0.msixbundle');
     expect(bundleName({ version: '1.0.0', dataLocation: 'userprofile' })).toBe('Burrow_1.0.0_userprofile.msixbundle');
-    const env = { LOCALAPPDATA: 'C:\\Users\\example\\AppData\\Local' };
+    const LOCAL = path.join(os.tmpdir(), 'example', 'AppData', 'Local');
+    const env = { LOCALAPPDATA: LOCAL };
     const dir = (over) => resolveOutDir({ root: ROOT, version: '1.0.0', localTest: false, outDir: null, env, ...over });
     expect(dir({})).toMatch(/store[\\/]1\.0\.0$/);
     expect(dir({ dataLocation: 'userprofile' })).toMatch(/store[\\/]1\.0\.0-userprofile$/);

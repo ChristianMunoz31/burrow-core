@@ -2,7 +2,6 @@
 // checks) runs first, and APP_PASSWORD is ignored. Env is set before the app imports.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
-import { resetLicenseForTests } from '../license/index.js';
 import { cleanupBackupEnv } from './helpers/backupEnv.js';
 import { SAME_ORIGIN, freshDb, licenseRows, rowCounts, seedEverything } from './helpers/eraseEnv.js';
 
@@ -37,7 +36,6 @@ beforeEach(() => {
   freshDb();
 });
 afterEach(() => {
-  resetLicenseForTests();
   cleanupBackupEnv();
 });
 
@@ -88,12 +86,11 @@ describe('desktop mode', () => {
     const requested = await gated('/api/data/erase/request', { Cookie: cookie });
     expect(requested.status).toBe(200);
     expect(requested.headers['cache-control']).toBe('no-store');
-    const trial = licenseRows(db)['license.trial'];
     const res = await gated('/api/data/erase', { Cookie: cookie }, { token: requested.body.data.token, phrase: 'ERASE' });
     expect(res.status).toBe(200);
     expect(res.body.data.erased).toBe(true);
     expect(rowCounts(db).journal).toBe(0);
-    expect(licenseRows(db)['license.trial']).toEqual(trial);
+    expect(licenseRows(db)).toEqual({});
   });
 
   it('a token is bound to the cookie: the same token without the cookie gets 401 from the gate', async () => {

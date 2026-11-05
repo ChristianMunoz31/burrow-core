@@ -13,9 +13,8 @@ export default function DangerZone() {
         Danger zone
       </h4>
       <p className="mt-1 text-xs text-slate-slate400">
-        Erase all my data permanently deletes everything you saved in Burrow on this computer. Kept: your license
-        (unless you remove it), your Pro trial status, and your backups (unless you delete them too). This cannot be
-        undone.
+        Erase all my data permanently deletes everything you saved in Burrow on this computer. Kept: your backups
+        (unless you delete them too). This cannot be undone.
       </p>
       <button
         ref={trigger}

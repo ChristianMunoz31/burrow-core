@@ -88,13 +88,6 @@ async function renderShot(browser, server, shot, outDir, blocked) {
       return route.abort();
     });
     const page = await context.newPage();
-    // The welcome and trial notices are first-run chrome; mark them seen so they do not cover the UI.
-    for (const notice of ['welcome', 'ending_soon', 'ended']) {
-      await context.request.post(`${server.url}/api/license/trial/notice`, {
-        data: { notice },
-        headers: { Origin: server.url },
-      });
-    }
     // A fresh demo folder has no backup yet, which would put a reminder banner on Home.
     await context.request.post(`${server.url}/api/backups`, { data: {}, headers: { Origin: server.url } });
     await page.goto(shot.url);

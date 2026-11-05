@@ -5,7 +5,6 @@ import { openCommandPalette } from '../../hooks/useCommandPalette';
 import NotificationBell from './NotificationBell';
 import BackButton from './BackButton';
 import DevBuildBadge from './DevBuildBadge';
-import TrialBadge from './TrialBadge';
 import { SHELL_ICON_BTN, SHELL_ICON_BTN_ACTIVE } from './shellStyles';
 
 // "⌘K" on Apple platforms, "Ctrl K" elsewhere.
@@ -54,7 +53,6 @@ export default function TopBar() {
           Burrow
         </Link>
         <DevBuildBadge />
-        <TrialBadge />
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1">

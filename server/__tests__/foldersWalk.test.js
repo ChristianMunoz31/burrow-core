@@ -159,7 +159,11 @@ describe('limits', () => {
   it('stops after maxEntries and records max_entries', async () => {
     writeTree(dir, Object.fromEntries(Array.from({ length: 10 }, (_v, i) => [`f${String(i).padStart(2, '0')}.txt`, 'x'])));
     const { items, meta } = await walk({ maxEntries: 4 });
-    expect(files(items)).toEqual(['f00.txt', 'f01.txt', 'f02.txt', 'f03.txt']);
+    // Which four depends on the file system's directory order (NTFS lists by name, ext4 does not); they come back sorted.
+    const got = files(items);
+    expect(got).toHaveLength(4);
+    expect(got).toEqual([...got].sort());
+    for (const name of got) expect(name).toMatch(/^f0\d\.txt$/);
     expect(meta.limitsHit.has('max_entries')).toBe(true);
     expect(meta.entries).toBe(4);
   });

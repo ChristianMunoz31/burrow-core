@@ -8,11 +8,10 @@ import {
   setNetworkFeature,
 } from './netPolicy.js';
 import { disableCloudAi } from './aiSettingsRoutes.js';
-import { getLicenseStatus } from './license/index.js';
 import { isManualDownloadAvailable, isShellUpdaterAvailable } from './desktop/shellChannel.js';
 import { getChannel } from './channel.js';
 import { isStoreDistribution } from './distribution.js';
-import { checkForUpdate, licenseImpactFor } from './updateCheck.js';
+import { checkForUpdate } from './updateCheck.js';
 import { sendStorageError } from './storageErrors.js';
 import {
   INVALID_LOCATION_MESSAGE,
@@ -25,28 +24,20 @@ import {
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const badRequest = (res, error) => res.status(400).json({ error, code: 'invalid_body' });
 
-/** What the update check says about installing: computed per request, never cached across license changes. */
-function withInstallInfo(status, { licenseStatus, installSupported, manualSupported }) {
+/** What the update check says about installing: computed per request, never cached. */
+function withInstallInfo(status, { installSupported, manualSupported }) {
   if (status?.status !== 'available') return status;
-  let impact;
-  try {
-    impact = licenseImpactFor(status, licenseStatus());
-  } catch {
-    // No readable license state: the update is not offered (a licensed user must not be let through blindly).
-    impact = { licenseImpact: 'unknown', updatesUntil: null };
-  }
-  return { ...status, canInstall: installSupported(), canDownload: manualSupported(), ...impact };
+  return { ...status, canInstall: installSupported(), canDownload: manualSupported() };
 }
 
 /**
  * @param {import('express').Express} app
- * @param {{ licenseStatus?: () => object, installSupported?: () => boolean, storeBuild?: () => boolean,
+ * @param {{ installSupported?: () => boolean, storeBuild?: () => boolean,
  *   devBuild?: () => boolean, manualSupported?: () => boolean }} [deps] test seams
  */
 export function registerSettingsRoutes(
   app,
   {
-    licenseStatus = getLicenseStatus,
     installSupported = () => isShellUpdaterAvailable(),
     storeBuild = () => isStoreDistribution(),
     devBuild = () => getChannel() === 'dev',
@@ -159,7 +150,7 @@ export function registerSettingsRoutes(
         refresh: req.query.refresh === '1',
         source: installSupported() ? 'manifest' : 'release',
       });
-      res.json({ data: withInstallInfo(status, { licenseStatus, installSupported, manualSupported }) });
+      res.json({ data: withInstallInfo(status, { installSupported, manualSupported }) });
     } catch (err) {
       if (err?.status === 403) return res.status(403).json(networkRequiredBody('updates'));
       return res.status(500).json({ error: 'Update check failed' });

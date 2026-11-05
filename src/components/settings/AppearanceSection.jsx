@@ -4,7 +4,6 @@ import { sectionProps } from './settingsSections';
 import SegmentedRadio from './SegmentedRadio';
 import BackgroundPicker from './BackgroundPicker';
 import ResetControl from './ResetControl';
-import { useTheme } from '../../contexts/ThemeContext';
 
 const THEME_OPTIONS = [
   { value: 'system', label: 'System' },
@@ -22,7 +21,6 @@ export default function AppearanceSection({
   onBgLightChange,
   onReset,
 }) {
-  const { founderUnlocked, founderSaved } = useTheme();
   return (
     <SectionCard
       {...sectionProps('appearance')}
@@ -48,20 +46,13 @@ export default function AppearanceSection({
           name="settings-bg-dark"
           value={bgDark}
           onChange={onBgDarkChange}
-          founderUnlocked={founderUnlocked}
         />
         <BackgroundPicker
           legend="Light mode background"
           name="settings-bg-light"
           value={bgLight}
           onChange={onBgLightChange}
-          founderUnlocked={founderUnlocked}
         />
-        {founderSaved && (
-          <p className="text-xs text-slate-slate400">
-            Your Founder background comes back when a Founding license is active.
-          </p>
-        )}
         <p className="text-xs text-slate-slate400">
           Backgrounds are hidden while your system's reduced transparency or increased contrast
           setting is on.

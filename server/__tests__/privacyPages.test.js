@@ -5,6 +5,7 @@ import { NETWORK_FEATURES as POLICY_FEATURES, listNetworkFeatures } from '../net
 import { renderPages, esc } from '../../scripts/privacy/renderPrivacy.mjs';
 import { findPrivacyProblems } from '../../scripts/privacy/checkPrivacy.mjs';
 
+const privacyConfig = JSON.parse(readFileSync(new URL('../../config/privacy.json', import.meta.url), 'utf8'));
 const rendered = renderPages();
 const fromDisk = (rel) => {
   try {
@@ -43,7 +44,7 @@ describe('privacy pages', () => {
     expect(renderPages()).toEqual(rendered);
     const html = rendered['privacy/index.html'];
     expect(html).toContain('burrowsupport@gmail.com');
-    expect(html).toContain('Effective 2026-10-11');
+    expect(html).toContain(`Effective ${privacyConfig.effectiveDate}`);
     expect(html).toContain('https://privacy.microsoft.com/privacystatement');
     expect(html).not.toMatch(/<script|https?:\/\/fonts\.|<link /i);
     expect(html).not.toContain('\u2014');

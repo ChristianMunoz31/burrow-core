@@ -6,14 +6,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildChildEnv } from '../../scripts/lib/sandboxSafety.js';
-import { EVIDENCE_COLUMNS } from '../license/clockGuard.js';
 import { seedDemo } from '../../scripts/seedDemo.js';
 import { TABLES, insert, openDb, setDbForTests } from '../db/index.js';
 
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'seedDemo.js');
 
-// The only columns allowed to hold a future value: user-chosen scheduled dates, which the license
-// clock guard ignores (docs/LICENSING.md 7.4). Everything else (every created_at, updated_at,
+// The only columns allowed to hold a future value: user-chosen scheduled dates. Everything else (every created_at, updated_at,
 // started_at, journal date, completion and transaction date, JSON dates in app_state) must be <= now.
 const FUTURE_ALLOWED = new Set([
   'calendar_events.start_at', // upcoming events the user scheduled
@@ -173,11 +171,6 @@ describe('seedDemo never writes future timestamps', () => {
     } finally {
       raw.close();
     }
-  });
-
-  it('keeps FUTURE_ALLOWED disjoint from the clock guard evidence columns', () => {
-    const evidence = new Set(EVIDENCE_COLUMNS.map(([table, column]) => `${table}.${column}`));
-    expect([...FUTURE_ALLOWED].filter((key) => evidence.has(key))).toEqual([]);
   });
 
   it.each([

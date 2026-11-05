@@ -31,12 +31,7 @@
               window.matchMedia('(prefers-color-scheme: light)').matches);
           if (light) root.classList.add('light');
           var presets = ['aurora', 'ocean', 'sunset', 'forest', 'graphite', 'solid', 'founder'];
-          // 'founder' is applied only while the cached last-known founder perk is '1'
-          // (src/utils/founderPerkCache.js); otherwise the default preset ('aurora', see
-          // SETTINGS_DEFAULTS bgLight/bgDark) is used. React then applies the real flag.
-          var founderOk = localStorage.getItem('burrow.license:founderPerk') === '1';
           var pick = function (value) {
-            if (value === 'founder' && !founderOk) return 'aurora';
             return presets.indexOf(value) !== -1 ? value : null;
           };
           var bgLight = pick(read('burrow.appearance:bgLight'));

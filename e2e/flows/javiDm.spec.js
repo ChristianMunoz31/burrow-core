@@ -1,13 +1,13 @@
 // Javi's "new for you" inbox and the DM keyboard rules (docs/design/javi-dm-2026-10.md 1.6, 2.4 to 2.7, R20, and the
 // 2026-10-10 update: a page with data counts until Javi is opened there, and an own edit counts again), on
-// the docked Javi bar (docs/design/minimal-shell-2026-10.md 4), Pro (the fresh data folder's trial) against the fake Ollama. Tests run in order on one server: each one leaves
+// the docked Javi bar (docs/design/minimal-shell-2026-10.md 4), against the fake Ollama. Tests run in order on one server: each one leaves
 // nothing unread that a later one counts on its page.
 import { test, expect, useBurrow } from '../support/fixtures.js';
 import { PLAIN_REPLY } from '../../scripts/lib/fakeOllamaServer.js';
 import { inboxIds, javi, markSeen, seedCalendarChange, waitForActivePage } from '../pages/javi.js';
 import { todos } from '../pages/todos.js';
 
-useBurrow({ seed: true, ollama: 'fake', preseed: { trialEnded: true } });
+useBurrow({ seed: true, ollama: 'fake' });
 
 const heading = (page, name) => page.getByRole('heading', { level: 2, name, exact: true }).first();
 

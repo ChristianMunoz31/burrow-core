@@ -30,7 +30,6 @@ import {
   fetchInstallerChecksum,
   fetchLatestManifest,
   installerUrl,
-  licenseImpactFor,
   parseLatestRelease,
   parseSums,
   releaseNotesText,
@@ -387,58 +386,10 @@ describe('notes sanitizing', () => {
   });
 });
 
-describe('licenseImpactFor', () => {
-  const avail = { status: 'available', channel: 'stable', publishedAt: '2030-06-01T00:00:00Z' };
-  const lic = (updatesUntil, proSource = 'license') => ({ proSource, license: { updatesUntil } });
-
-  it('blocks a paid license released after updatesUntil, by one second', () => {
-    expect(licenseImpactFor(avail, lic('2030-01-01T00:00:00Z'))).toEqual({
-      licenseImpact: 'blocked',
-      updatesUntil: '2030-01-01T00:00:00Z',
-    });
-    expect(licenseImpactFor(avail, lic('2030-05-31T23:59:59Z')).licenseImpact).toBe('blocked');
-  });
-
-  it('includes a release published at the same instant as updatesUntil, or before it', () => {
-    expect(licenseImpactFor(avail, lic('2030-06-01T00:00:00Z'))).toEqual({
-      licenseImpact: 'included',
-      updatesUntil: '2030-06-01T00:00:00Z',
-    });
-    expect(licenseImpactFor(avail, lic('2031-01-01T00:00:00Z')).licenseImpact).toBe('included');
-  });
-
-  it.each([
-    ['the trial', lic('2030-01-01T00:00:00Z', 'local_trial')],
-    ['no pro source (free, lapsed or expired)', lic('2030-01-01T00:00:00Z', null)],
-    ['no license status', null],
-    ['an undefined license status', undefined],
-  ])('is free for %s', (_label, license) => {
-    expect(licenseImpactFor(avail, license)).toEqual({ licenseImpact: 'free', updatesUntil: null });
-  });
-
-  it.each([
-    ['no license record', avail, { proSource: 'license', license: null }],
-    ['a bad updatesUntil', avail, lic('soon')],
-    ['no updatesUntil', avail, lic(undefined)],
-    ['no publish date', { ...avail, publishedAt: null }, lic('2030-01-01T00:00:00Z')],
-    ['a bad publish date', { ...avail, publishedAt: 'soon' }, lic('2030-01-01T00:00:00Z')],
-  ])('is unknown for %s', (_label, status, license) => {
-    expect(licenseImpactFor(status, license).licenseImpact).toBe('unknown');
-  });
-
-  it('keeps the updatesUntil string when only the release date is bad', () => {
-    expect(licenseImpactFor({ ...avail, publishedAt: 'soon' }, lic('2030-01-01T00:00:00Z'))).toEqual({
-      licenseImpact: 'unknown',
-      updatesUntil: '2030-01-01T00:00:00Z',
-    });
-  });
-
-  it.each([
-    ['the dev channel', { ...avail, channel: 'dev' }],
-    ['a current status', { status: 'current' }],
-    ['no status', null],
-  ])('is null for %s', (_label, status) => {
-    expect(licenseImpactFor(status, lic('2030-01-01T00:00:00Z'))).toEqual({ licenseImpact: null, updatesUntil: null });
+describe('no license rule', () => {
+  it('updateCheck no longer exports a license impact rule', async () => {
+    const mod = await import('../updateCheck.js');
+    expect(mod).not.toHaveProperty('licenseImpactFor');
   });
 });
 

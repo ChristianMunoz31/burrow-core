@@ -1,26 +1,18 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../../../hooks/useEntitlements', async () => (await import('../../../test-utils/entitlements.js')).entitlementsModule());
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import JaviPanel from '../JaviPanel';
 import { EMPTY_AGENT } from '../timeline';
-import { FREE_STATE, resetEntitlementsState, setEntitlementsState } from '../../../test-utils/entitlements.js';
 
 // The DM look of the panel: header, greeting, bubble tails, the "New for you" strip and the spoken reply cap.
-const license = vi.hoisted(() => ({ status: null }));
-vi.mock('../../../hooks/useLicense', () => ({ useLicense: () => ({ status: license.status }) }));
 vi.mock('../../../hooks/useJarvisStatus', () => ({
   useJarvisStatus: () => ({ status: { ai: { kind: 'local', host: null } }, loading: false, error: null }),
 }));
 
-beforeEach(() => {
-  license.status = { state: 'update_window_passed', pro: false, license: null, proSource: null, purchaseUrl: '', trial: { state: 'ended' } };
-});
 afterEach(() => {
   cleanup();
-  resetEntitlementsState();
 });
 
 const idleThread = { messages: [], status: 'idle', error: null, lastRequestMessages: null, partial: '' };
@@ -56,11 +48,7 @@ function setup(overrides = {}) {
 }
 
 describe('DM header', () => {
-  it.each([
-    ['Pro', null],
-    ['Free', FREE_STATE],
-  ])('%s shows the avatar, Javi, the AI helper tag and About {page}', (_label, state) => {
-    if (state) setEntitlementsState(state);
+  it('shows the avatar, Javi, the AI helper tag and About {page}', () => {
     setup();
     const dialog = screen.getByRole('dialog', { name: 'Javi' });
     expect(within(dialog).getByText('AI helper')).toBeVisible();
@@ -72,7 +60,6 @@ describe('DM header', () => {
 
 describe('greeting and bubbles', () => {
   it('the one insight bubble gets the tail and a Report link', () => {
-    setEntitlementsState(FREE_STATE);
     setup({ thread: card('Insight text') });
     expect(screen.getByText('Insight text').closest('.glass-javi-inner')).toHaveClass('rounded-2xl', 'rounded-bl-md');
     expect(screen.getAllByRole('link', { name: 'Report this Javi reply by email' })).toHaveLength(1);
@@ -89,8 +76,7 @@ describe('greeting and bubbles', () => {
     expect(props.onNewAdvice).toHaveBeenCalledTimes(1);
   });
 
-  it('Free open after a change shows exactly one assistant bubble and no composer', () => {
-    setEntitlementsState(FREE_STATE);
+  it('open after a change shows exactly one assistant bubble and no composer in a core-only build', () => {
     setup({ thread: card(), rows: rowsOf(1) });
     expect(document.querySelectorAll('.glass-javi-inner')).toHaveLength(1);
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
@@ -103,8 +89,7 @@ describe('greeting and bubbles', () => {
 });
 
 describe('New for you strip', () => {
-  it('sits after the thread on Free (the insight first in tab order)', () => {
-    setEntitlementsState(FREE_STATE);
+  it('sits after the thread without the module (the insight first in tab order)', () => {
     setup({ thread: card('The insight'), rows: rowsOf(1) });
     const strip = screen.getByText('New for you');
     const insight = screen.getByText('The insight');

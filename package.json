@@ -1,7 +1,7 @@
 {
   "name": "burrow",
   "private": true,
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "Burrow - a local-first personal data OS.",
   "license": "AGPL-3.0-only",
   "type": "module",
@@ -32,7 +32,6 @@
     "check:em-dash": "node scripts/checks/noEmDash.js",
     "check:personal": "node scripts/checks/personalData.js",
     "check:keys": "node scripts/checks/noPrivateKeys.js",
-    "check:store-config": "node scripts/checks/storeConfig.js",
     "check:privacy": "node scripts/privacy/checkPrivacy.mjs",
     "privacy:render": "node scripts/privacy/renderPrivacy.mjs",
     "check:bundle": "node scripts/checks/bundleBudget.js",

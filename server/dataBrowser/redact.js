@@ -1,6 +1,8 @@
 // Heuristic redaction for app_state rows shown in the data browser. Defense in
 // depth, not a guarantee: real secrets no longer live in app_state.
 
+import { ACTIVATION_STATE_KEY } from '../license/constants.js';
+
 export const REDACTED = '[redacted]';
 
 // app_state rows no API ever returns (state, data browser, export): the license activation holds the buyer's
@@ -9,7 +11,7 @@ export const REDACTED = '[redacted]';
 // app_state rows that never leave this computer: no export, no import, hidden from the state API and the data browser;
 // kept in backups and restore. javi.inbox is behavioural metadata (when you looked at which page).
 export const LOCAL_ONLY_APP_STATE_KEYS = new Set(['javi.inbox']);
-export const HIDDEN_APP_STATE_KEYS = new Set(['license.activation', 'dev.licenseOverride', ...LOCAL_ONLY_APP_STATE_KEYS]);
+export const HIDDEN_APP_STATE_KEYS = new Set([ACTIVATION_STATE_KEY, 'dev.licenseOverride', ...LOCAL_ONLY_APP_STATE_KEYS]);
 
 // Substring match on a key normalized as: camelCase -> snake (insert '_' at lower->Upper),
 // lowercase. Deliberately broad (fail closed): `author`/`authorName` are spared by the

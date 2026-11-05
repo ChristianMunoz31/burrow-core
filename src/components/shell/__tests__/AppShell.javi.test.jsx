@@ -13,16 +13,6 @@ vi.mock('../BurgerMenu', () => ({ default: () => null }));
 vi.mock('../TopBar', () => ({ default: () => null }));
 vi.mock('../../palette/CommandPalette', () => ({ default: () => null }));
 
-// TrialNotice reads the license status through the service; keep it off the network.
-vi.mock('../../../services/licenseService', () => ({
-  licenseService: { get: vi.fn(async () => ({ state: 'free', pro: false })) },
-}));
-
-// TrialNotice also waits for the profile (no banner during onboarding); keep that off the network too.
-vi.mock('../../../hooks/useProfile', () => ({
-  useProfile: () => ({ onboarded: true, isLoading: false, unresolved: false }),
-}));
-
 const settings = vi.hoisted(() => ({ value: { showButton: true, autoAdvise: true } }));
 vi.mock('../../../hooks/useJaviSettings', () => ({ useJaviSettings: () => settings.value }));
 
@@ -100,7 +90,7 @@ describe('AppShell Javi bar wiring', () => {
     mount('/todos');
     await waitFor(() => expect(inboxState.posts).toEqual([{ ids: [] }]));
     const paths = fetch.mock.calls.map(([url]) => String(url));
-    expect(paths.every((p) => p.startsWith('/api/jarvis/inbox') || p === '/api/jarvis/briefing' || p === '/api/license')).toBe(true);
+    expect(paths.every((p) => p.startsWith('/api/jarvis/inbox') || p === '/api/jarvis/briefing')).toBe(true);
   });
 
   it('counts every new item except the current page', async () => {

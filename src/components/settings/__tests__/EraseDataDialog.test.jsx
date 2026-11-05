@@ -74,11 +74,11 @@ describe('typed confirmation', () => {
     expect(review()).toBeEnabled();
   });
 
-  it('starts with the final export on and the two destructive extras off', () => {
+  it('starts with the final export on and the destructive extra off', () => {
     setup();
     expect(screen.getByRole('checkbox', { name: /Download a final export first/ })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /^Also delete all backups on this computer/ })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /^Also remove my license from this computer/ })).not.toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: /license/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /I understand/ })).not.toBeInTheDocument();
   });
 
@@ -116,7 +116,7 @@ describe('the password (web sign-in only)', () => {
     await user.click(review());
     await user.click(within(finalDialog()).getByRole('button', { name: 'Erase my data' }));
     await waitFor(() => expect(eraseAllData).toHaveBeenCalled());
-    expect(eraseAllData).toHaveBeenCalledWith({ token: 'tok-123', phrase: 'ERASE', removeLicense: false, deleteBackups: false, password: 'pw-1' });
+    expect(eraseAllData).toHaveBeenCalledWith({ token: 'tok-123', phrase: 'ERASE', deleteBackups: false, password: 'pw-1' });
   });
 });
 
@@ -132,8 +132,7 @@ describe('the final confirm dialog', () => {
       expect(deleted.getByText(text)).toBeInTheDocument();
     }
     const kept = within(within(dialog).getByRole('heading', { name: 'Kept:' }).closest('section'));
-    expect(kept.getByText('Your license activation (it includes your purchase email), unless you remove it.')).toBeInTheDocument();
-    expect(kept.getByText('Your Pro trial status is kept.')).toBeInTheDocument();
+    expect(kept.queryByText(/licen[sc]e|trial|purchase/i)).not.toBeInTheDocument();
     expect(
       kept.getByText(
         'Your finished backups stay in C:\\Data\\Burrow\\backups and can restore everything.',
@@ -144,20 +143,17 @@ describe('the final confirm dialog', () => {
     expect(eraseAllData).not.toHaveBeenCalled();
   });
 
-  it('reflects the options: license removed, backups deleted, no export', async () => {
+  it('reflects the options: backups deleted, no export', async () => {
     const { user } = setup();
     await user.click(screen.getByRole('checkbox', { name: /Download a final export first/ }));
     await user.click(screen.getByRole('checkbox', { name: "I understand I can't undo this" }));
     await user.click(screen.getByRole('checkbox', { name: /^Also delete all backups on this computer/ }));
-    await user.click(screen.getByRole('checkbox', { name: /^Also remove my license from this computer/ }));
     await typeErase(user);
     await user.click(review());
     const dialog = finalDialog();
-    expect(within(dialog).getByText('Your license will be removed from this computer.')).toBeInTheDocument();
-    expect(within(dialog).getByText('Your Pro trial status is kept.')).toBeInTheDocument();
     expect(within(dialog).getByText('All backups will be deleted too, so nothing can restore your data.')).toBeInTheDocument();
     expect(within(dialog).queryByText(/can restore everything/)).not.toBeInTheDocument();
-    expect(within(dialog).queryByText(/purchase email/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/licen[sc]e|trial|purchase/i)).not.toBeInTheDocument();
     expect(within(dialog).getByText('No export will be saved.')).toBeInTheDocument();
   });
 
@@ -190,11 +186,10 @@ describe('erasing', () => {
     });
     eraseAllData.mockImplementation(async () => calls.push('erase'));
     const { user, client } = setup();
-    await user.click(screen.getByRole('checkbox', { name: /^Also remove my license from this computer/ }));
     await confirmAll(user);
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
     expect(calls).toEqual(['export', 'token', 'erase']);
-    expect(eraseAllData).toHaveBeenCalledWith({ token: 'tok-9', phrase: 'ERASE', removeLicense: true, deleteBackups: false });
+    expect(eraseAllData).toHaveBeenCalledWith({ token: 'tok-9', phrase: 'ERASE', deleteBackups: false });
     expect(localStorage.getItem('burrow.profile')).toBeNull();
     expect(localStorage.getItem('other.key')).toBe('keep');
     expect(client.getQueryData(['todos'])).toBeUndefined();
@@ -208,7 +203,7 @@ describe('erasing', () => {
     await confirmAll(user);
     await waitFor(() => expect(replace).toHaveBeenCalled());
     expect(downloadExport).not.toHaveBeenCalled();
-    expect(eraseAllData).toHaveBeenCalledWith({ token: 'tok-123', phrase: 'ERASE', removeLicense: false, deleteBackups: true });
+    expect(eraseAllData).toHaveBeenCalledWith({ token: 'tok-123', phrase: 'ERASE', deleteBackups: true });
   });
 
   it('stops when the export fails: nothing is erased, and it says so', async () => {

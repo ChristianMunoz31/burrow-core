@@ -41,7 +41,7 @@ vi.mock('../../../services/aiSettingsService', () => ({
   aiSettingsService: { get: vi.fn(() => new Promise(() => {})), models: vi.fn(() => new Promise(() => {})) },
 }));
 
-const CORE_LABELS = ['Appearance', 'Budget', 'General', 'AI', 'Data & storage', 'Privacy & activity', 'Network', 'Connected services', 'License', 'Updates'];
+const CORE_LABELS = ['Appearance', 'Budget', 'General', 'AI', 'Data & storage', 'Privacy & activity', 'Network', 'Connected services', 'Updates'];
 const origIO = globalThis.IntersectionObserver;
 
 class FakeIO {
@@ -119,7 +119,8 @@ describe('Settings extensions in the core build', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    expect(document.getElementById('license')).toBeInTheDocument();
+    expect(document.getElementById('updates')).toBeInTheDocument();
+    expect(document.getElementById('license')).toBeNull();
     expect(document.getElementById('developer')).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Developer' })).not.toBeInTheDocument();
   });

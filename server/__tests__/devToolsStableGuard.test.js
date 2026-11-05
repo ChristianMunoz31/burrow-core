@@ -81,7 +81,7 @@ describe('stable build paths exclude the developer tools', () => {
   it('the Docker image keeps its devtools refusal (no marker in the runtime code or UI, no devtools/ folder)', () => {
     const dockerfile = read('Dockerfile');
     const runtime = dockerfile.slice(dockerfile.lastIndexOf('\nFROM '));
-    const marker = runtime.indexOf('RUN ! grep -rqF -e "BURROW_DEV_TOOLS=on" -e "/dev/license" server.js server dist');
+    const marker = runtime.indexOf('RUN ! grep -rqF -e "BURROW_DEV_TOOLS=on" -e "/dev/status" server.js server dist');
     expect(marker).toBeGreaterThan(runtime.indexOf('COPY --from=build /app/dist ./dist'));
     expect(runtime).toMatch(/^RUN test ! -e devtools$/m);
     expect(read('.dockerignore').split(/\r?\n/)).toContain('devtools');

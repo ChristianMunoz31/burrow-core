@@ -1,4 +1,4 @@
-// In-memory cache of finished insight-card answers (Free, single-shot page advice on a local model).
+// In-memory cache of finished insight-card answers (single-shot page advice on a local model).
 //
 // A card is re-asked on every panel open; the same page data under the same model gives the same
 // card, so a hit replays the stored text and makes no model call. Never used for cloud answers

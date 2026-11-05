@@ -2,7 +2,7 @@
 
 Owner-only runbook for [ADR 0001](adr/0001-open-core-split.md) section 3.14. It covers the first publication of the core, the copy flip, later syncs and contribution intake. Contract and module boundary: [OPEN_CORE.md](OPEN_CORE.md).
 
-**Status: sections 2 and 3 are done (2026-11-04): the core is published at https://github.com/ChristianMunoz31/burrow-core, and the copy flip (5.1) is applied in the private repo. Section 4 (the CLA check) is not done: the CLA is still a draft pending legal review.** Public copy may say the core is open source under AGPL-3.0-only. It must never say that Pro is open source or that Pro's source is public, and Docker self-hosting is not offered, so never claim "self-host".
+**Status: sections 2 and 3 are done (2026-11-04): the core is published at https://github.com/ChristianMunoz31/burrow-core, and the copy flip (5.1) is applied in the private repo. Section 4 (the CLA check) is not done: the CLA is still a draft pending legal review.** Public copy may say the core is open source under AGPL-3.0-only. It must never say that the private module is open source or that its source is public (since 2026-11-05 Burrow is free for everyone, see [adr/0002-free-for-everyone.md](adr/0002-free-for-everyone.md)), and Docker self-hosting is not offered, so never claim "self-host".
 
 Run every command from the root of the private core checkout, in PowerShell, unless it says otherwise. Use `npm.cmd` if `npm` is blocked by the execution policy.
 
@@ -10,7 +10,7 @@ Run every command from the root of the private core checkout, in PowerShell, unl
 
 Do not start until all of these are true.
 
-- [ ] QA 7.1 (Pro mode) and QA 7.2 (Free mode) of [adr/0001-work-split.md](adr/0001-work-split.md) section 7 are green. They include `npm run check`, the boundary tests and `npm run export:core -- --out "$env:TEMP\burrow-core-export"`. Not recorded here; confirm before the next sync.
+- [ ] QA 7.1 (with the module) and QA 7.2 (core-only mode) of [adr/0001-work-split.md](adr/0001-work-split.md) section 7 are green. They include `npm run check`, the boundary tests and `npm run export:core -- --out "$env:TEMP\burrow-core-export"`. Not recorded here; confirm before the next sync.
 - [ ] The dependency license audit is clean (ADR R13): review `THIRD_PARTY_NOTICES.md` and `npm ls --omit=dev --all` for any GPL, AGPL or LGPL package in the shipped bundles. Any hit blocks the first export. Team S runs this audit. Not recorded here; confirm before the next sync.
 - [ ] You have had [CLA.md](CLA.md) reviewed by a lawyer (ADR R15). It is a draft until then. Deferred (2026-11-04): still a draft; the CLA check (section 4) stays off until the review is done.
 - [ ] You have had [EULA.md](EULA.md) reviewed (ADR O5). It is a draft until then, and it is the notice for official builds that combine the AGPL core with the proprietary Pro module. Deferred (2026-11-04): still a draft.
@@ -122,7 +122,7 @@ Do not enable `cla.yml` before [CLA.md](CLA.md) has had its legal review.
 
 ## 5. Copy flip list
 
-Sections 2 and 3 are done (2026-11-04) and the copy flip below is applied in the private repo. Keep this list as the record of what changed. Find lines by their text, because line numbers move. The binding rule stays after the flip: say only what is true, and keep Pro described as a private module.
+Sections 2 and 3 are done (2026-11-04) and the copy flip below is applied in the private repo. Keep this list as the record of what changed. Find lines by their text, because line numbers move. The binding rule stays after the flip: say only what is true, and keep the Pro module described as a private module.
 
 ### 5.1 Files to change
 
@@ -136,12 +136,11 @@ Sections 2 and 3 are done (2026-11-04) and the copy flip below is applied in the
 | `package.json` | `"license": "AGPL-3.0-only"` (already applied by the split). |
 | `src-tauri/src/menu.rs` | `about_comments` (the Help > About Burrow text, "Private, local-first budget and journal tracker."). Optional: add one short sentence about the core source. A Rust test in the same file pins the text, so update it with the string. |
 | `src/components/settings/VerifyYourself.jsx` | Settings > Network "verify it yourself" section. Today it has no source wording. Optional: one sentence and a link to the public repo. |
-| `src/components/settings/LicenseSection.jsx` | Settings > License. Today it shows "Burrow Pro features: not included in this build" when `proModule` is false. Optional: a link to the public repo. |
 | `src/components/settings/__tests__/NetworkActivity.test.jsx` | The test "has no em dashes and makes no claims about public source" fails on `open source`, `AGPL`, `self-host` and `public source` wording. Update it in the same change as any copy that uses those words. |
 | `pages/` (privacy site, generated) | Currently has no source wording. If you add any, change `scripts/privacy/renderPrivacy.mjs` (or the registry it renders) and run `npm run privacy:render`, then re-publish the page to the `gh-pages` branch of `burrow-releases` as in `docs/RELEASING.md`. |
 | `docs/INSTALL.md` | Optional: a "Source" line for people who want to read the code. |
 | `docs/MICROSOFT_STORE.md` and `docs/store/chrome-prompts.md` | The Store listing copy (section 5 "Draft store listing" and prompt 4). Add the source sentence only if you want it in the listing; the Store copy rules in [DESIGN.md](DESIGN.md) still apply. |
-| Gumroad pages (outside the repo) | The three pages: Burrow Pro, the hidden student and nonprofit product, and the free Burrow download (ids in `config/store.json` and `config/gumroad-sync.json`), plus the storefront HTML in your `burrow-gumroad` folder. Use the draft in section 8. Each page keeps exactly one `Latest version:` paragraph and no other version number (`docs/RELEASING.md`). |
+| Gumroad pages (outside the repo) | Obsolete since 2026-11-05 (Burrow is free for everyone, ADR 0002): what happens to the Gumroad listing is an owner decision outside the code. The section 8 drafts are removed. |
 | `burrow-releases` release notes | `release-notes/vX.Y.Z.md` for the first release that mentions it. No link to the private repo (the publish script refuses one). |
 
 Do not touch: `docs/adr/*` (history), `CHANGELOG.md`.
@@ -167,7 +166,7 @@ git commit -m "chore(core): sync from vX.Y.Z"
 git push origin main
 ```
 
-`robocopy` exit codes 0 to 7 are success. Use a new, empty `--out` folder for each export. After the push, check that CI on the public repo is green (it runs Free mode and asserts `--expect-pro absent`).
+`robocopy` exit codes 0 to 7 are success. Use a new, empty `--out` folder for each export. After the push, check that CI on the public repo is green (it runs core-only mode and asserts `--expect-pro absent`).
 
 ## 7. Contribution intake
 
@@ -184,19 +183,9 @@ git push origin main
 4. At the next release, export and sync (section 6). The sync must show **no diff** for that contribution: the exported tree already contains it, byte for byte. If it does show a diff, the patch was applied differently. Fix the private copy to match the merged version, and do not sync until it matches.
 5. Never merge a public pull request that touches anything the export would leave out (for example `pro/` or `devtools/`): ask the contributor to drop it.
 
-## 8. Gumroad copy draft
+## 8. Gumroad copy draft (obsolete)
 
-**For Gumroad use.** The public repo exists (section 3 is done), so this text may be used on the Gumroad pages. Rules from [DESIGN.md](DESIGN.md) and [PRODUCT.md](PRODUCT.md) still apply: Burrow is a desktop app with a built-in helper, never "AI service", "access to AI", "AI tools" or a chatbot. Free Javi gives one insight per page. No version number in the paragraph. No dashes.
-
-### Free page
-
-> Burrow is a desktop app with a built-in helper, Javi, that gives you one quick insight about the page you are on. Your data stays on your computer, in open formats. The core of Burrow has its source on GitHub under AGPL, so anyone can read how your data is stored, backed up and kept offline. Pro features are a private module. Your data is never paywalled: export, import, backups and privacy controls are free.
-
-### Pro page
-
-> Burrow Pro adds follow-up questions to Javi, Javi's actions on your data (each one waits for your OK), a daily briefing, Explain for your cross insights, and questions and reports about the folders you pick. The core source of Burrow is on GitHub under AGPL. Pro features are a private module. Pro can only use the public core APIs, and this rule is enforced in our build. Your data stays on your computer, and export, import and backups stay free.
-
-Do not turn "enforced in our build" into "you can check Pro's source". Pro's source is not public (ADR R1).
+**Obsolete since 2026-11-05.** Burrow is free for everyone ([ADR 0002](adr/0002-free-for-everyone.md)), so the Free page and Pro page drafts that lived here are removed. What the owner decides about the Gumroad listing is outside the code. If any listing text is kept, the binding rules still apply: Burrow is a desktop app with a built-in helper, never "AI service", "access to AI", "AI tools" or a chatbot; no version number in the paragraph; no dashes; it may say the core source is on GitHub under AGPL, never that the private module is open source or that its source is public (ADR R1).
 
 ## 9. If something goes wrong
 

@@ -2,7 +2,7 @@
 
 `pages/` is generated. Never edit it by hand.
 
-- Source of truth: `server/netFeatures.js` (the registry behind Settings > Network), `config/store.json` (`supportContact`) and `config/privacy.json` (policy version and effective date).
+- Source of truth: `server/netFeatures.js` (the registry behind Settings > Network), `config/support.json` (`supportContact`) and `config/privacy.json` (policy version and effective date).
 - Regenerate: `npm run privacy:render`. Verify: `npm run check:privacy` (part of `npm run check`). It fails when `pages/` differs from a fresh render or when a feature id or host is missing from the page.
 - When you add or change a network feature, update its `policy` text in `server/netFeatures.js`, bump `config/privacy.json` if the policy meaning changed, and re-render.
 

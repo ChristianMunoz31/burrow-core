@@ -8,13 +8,12 @@ import { BACKGROUND_PRESETS } from '../../../constants/settingsDefaults';
 
 afterEach(cleanup);
 
-function Controlled({ initial = 'aurora', onChange, founderUnlocked }) {
+function Controlled({ initial = 'aurora', onChange }) {
   const [value, setValue] = useState(initial);
   return (
     <BackgroundPicker
       legend="Dark mode background"
       value={value}
-      founderUnlocked={founderUnlocked}
       onChange={(v) => {
         onChange?.(v);
         setValue(v);
@@ -116,9 +115,9 @@ describe('BackgroundPicker', () => {
     render(<Controlled initial="aurora" onChange={onChange} />);
     await user.tab();
     await user.keyboard('{ArrowLeft}');
-    expect(onChange).toHaveBeenLastCalledWith('solid');
+    expect(onChange).toHaveBeenLastCalledWith('founder');
     await user.keyboard('{ArrowUp}');
-    expect(onChange).toHaveBeenLastCalledWith('graphite');
+    expect(onChange).toHaveBeenLastCalledWith('solid');
   });
 
   it('Space on a focused unchecked radio selects it', async () => {
@@ -130,25 +129,21 @@ describe('BackgroundPicker', () => {
     expect(onChange).toHaveBeenCalledWith('graphite');
   });
 
-  it('hides the Founder preset by default', () => {
-    render(<Controlled />);
-    expect(screen.queryByRole('radio', { name: /^Founder/ })).not.toBeInTheDocument();
-  });
-
-  it('lists the Founder preset last when unlocked, with its swatches', () => {
-    const { container } = render(<Controlled founderUnlocked />);
+  it('lists the purple-and-gold preset last for everyone, with its swatches and no founding wording', () => {
+    const { container } = render(<Controlled />);
     const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(BACKGROUND_PRESETS.length + 1);
-    expect(radios.at(-1)).toHaveAccessibleName(/^Founder/);
+    expect(radios).toHaveLength(BACKGROUND_PRESETS.length);
+    expect(radios.at(-1)).toHaveAccessibleName(/^Purple and gold/);
     expect(container.querySelectorAll('.bg-swatch[data-preset="founder"]')).toHaveLength(2);
+    expect(container.textContent).not.toMatch(/founding|founder|member|license/i);
   });
 
-  it('selecting Founder calls onChange with founder', async () => {
+  it('selecting purple and gold calls onChange with the founder id', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
-    render(<Controlled founderUnlocked onChange={onChange} />);
-    await user.click(screen.getByRole('radio', { name: /^Founder/ }));
+    render(<Controlled onChange={onChange} />);
+    await user.click(screen.getByRole('radio', { name: /^Purple and gold/ }));
     expect(onChange).toHaveBeenCalledWith('founder');
-    expect(screen.getByRole('radio', { name: /^Founder/ })).toBeChecked();
+    expect(screen.getByRole('radio', { name: /^Purple and gold/ })).toBeChecked();
   });
 });

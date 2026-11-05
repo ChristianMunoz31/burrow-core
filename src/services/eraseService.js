@@ -33,6 +33,6 @@ export const requestEraseToken = () => post('/api/data/erase/request', {});
 
 /**
  * Step 2: erase with the token and the typed phrase.
- * @param {{ token: string, phrase: string, removeLicense: boolean, deleteBackups: boolean, password?: string }} input
+ * @param {{ token: string, phrase: string, deleteBackups: boolean, password?: string }} input
  */
 export const eraseAllData = (input) => post('/api/data/erase', input);

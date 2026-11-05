@@ -7,7 +7,6 @@ import { ThemeProvider, useTheme } from '../ThemeContext';
 import AppearanceSection from '../../components/settings/AppearanceSection';
 import { installMatchMedia, resetDom } from '../../test-utils/settingsHarness';
 import { lsKey } from '../../utils/storageKeys';
-import { LICENSE_QUERY_KEY } from '../../hooks/useLicense';
 
 // Fake server so background refetches return what the test "stored".
 const server = vi.hoisted(() => ({ map: new Map() }));
@@ -19,11 +18,7 @@ vi.mock('../../services/stateService', () => ({
   },
 }));
 
-vi.mock('../../services/licenseService', () => ({
-  licenseService: { get: vi.fn(async () => { throw new Error('offline'); }) },
-}));
-import { licenseService } from '../../services/licenseService';
-import { stateService } from '../../services/stateService';
+
 import { allowSlowSuite } from '../../test-utils/slowSuite';
 
 const html = document.documentElement;
@@ -221,162 +216,33 @@ describe('local cache vs empty server', () => {
   });
 });
 
-describe('Founder background gating', () => {
-  const FOUNDING = { perks: { founderBackground: true }, pro: true };
-  const STANDARD = { perks: { founderBackground: false }, pro: true };
-
+describe('Purple and gold background (id founder)', () => {
   function storeFounder() {
-    localStorage.setItem(lsKey('appearance:bgDark'), JSON.stringify('founder'));
-    localStorage.setItem(lsKey('appearance:bgLight'), JSON.stringify('founder'));
-    server.map.set('appearance:bgDark', 'founder');
-    server.map.set('appearance:bgLight', 'founder');
+    for (const k of ['appearance:bgDark', 'appearance:bgLight']) {
+      localStorage.setItem(lsKey(k), JSON.stringify('founder'));
+      server.map.set(k, 'founder');
+    }
   }
 
-  it('applies the founder background for a founding license', async () => {
+  it('applies a saved founder background with no license of any kind', async () => {
     storeFounder();
-    client.setQueryData(LICENSE_QUERY_KEY, FOUNDING);
     const { result } = await setup();
+    expect(result.current.bgDark).toBe('founder');
+    expect(result.current.bgLight).toBe('founder');
     expect(html).toHaveAttribute('data-bg-dark', 'founder');
     expect(html).toHaveAttribute('data-bg-light', 'founder');
-    expect(result.current.founderUnlocked).toBe(true);
-    expect(result.current.founderSaved).toBe(false);
-  });
-
-  it('falls back to aurora without the perk but keeps the saved preference', async () => {
-    storeFounder();
-    client.setQueryData(LICENSE_QUERY_KEY, STANDARD);
-    const { result } = await setup();
-    expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    expect(result.current.bgDark).toBe('aurora');
-    expect(result.current.founderUnlocked).toBe(false);
-    expect(result.current.founderSaved).toBe(true);
     expect(localStorage.getItem(lsKey('appearance:bgDark'))).toBe(JSON.stringify('founder'));
   });
 
-  const PERK_KEY = lsKey('license:founderPerk');
-
-  it('pending status with no cached entitlement applies the default, keeping the preference', async () => {
-    storeFounder();
-    licenseService.get.mockReturnValueOnce(new Promise(() => {}));
-    const { result } = await setup();
-    expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    expect(html).toHaveAttribute('data-bg-light', 'aurora');
-    expect(result.current.founderSaved).toBe(false);
-    expect(localStorage.getItem(lsKey('appearance:bgDark'))).toBe(JSON.stringify('founder'));
-    expect(localStorage.getItem(PERK_KEY)).toBeNull();
-  });
-
-  it('pending status with a cached entitlement applies the saved founder background', async () => {
-    storeFounder();
-    localStorage.setItem(PERK_KEY, '1');
-    licenseService.get.mockReturnValueOnce(new Promise(() => {}));
-    const { result } = await setup();
-    expect(html).toHaveAttribute('data-bg-dark', 'founder');
-    expect(html).toHaveAttribute('data-bg-light', 'founder');
-    expect(result.current.founderSaved).toBe(false);
-  });
-
-  it('failed status load follows the cache: default without it, founder with it', async () => {
+  it('exposes no founder perk state', async () => {
     storeFounder();
     const { result } = await setup();
-    await waitFor(() => expect(client.getQueryState(LICENSE_QUERY_KEY)?.status).toBe('error'));
-    expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    expect(result.current.founderUnlocked).toBe(false);
-    cleanup();
-
-    localStorage.setItem(PERK_KEY, '1');
-    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    await setup();
-    await waitFor(() => expect(client.getQueryState(LICENSE_QUERY_KEY)?.status).toBe('error'));
-    expect(html).toHaveAttribute('data-bg-dark', 'founder');
-  });
-
-  it('a known status without the perk clears the cached entitlement', async () => {
-    storeFounder();
-    localStorage.setItem(PERK_KEY, '1');
-    client.setQueryData(LICENSE_QUERY_KEY, STANDARD);
-    await setup();
-    expect(localStorage.getItem(PERK_KEY)).toBeNull();
-    expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    expect(localStorage.getItem(lsKey('appearance:bgDark'))).toBe(JSON.stringify('founder'));
-  });
-
-  it('a known status with the perk sets the cached entitlement', async () => {
-    storeFounder();
-    client.setQueryData(LICENSE_QUERY_KEY, FOUNDING);
-    await setup();
-    expect(localStorage.getItem(PERK_KEY)).toBe('1');
-  });
-
-  it('the real flag wins over a stale cache once known and updates it live', async () => {
-    storeFounder();
-    localStorage.setItem(PERK_KEY, '1');
-    client.setQueryData(LICENSE_QUERY_KEY, FOUNDING);
-    await setup();
-    await call(() => client.setQueryData(LICENSE_QUERY_KEY, STANDARD));
-    expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    expect(localStorage.getItem(PERK_KEY)).toBeNull();
-    await call(() => client.setQueryData(LICENSE_QUERY_KEY, FOUNDING));
-    expect(html).toHaveAttribute('data-bg-dark', 'founder');
-    expect(localStorage.getItem(PERK_KEY)).toBe('1');
-  });
-
-  it('losing the license (known true to known false) clears the cache without rewriting or syncing the preference', async () => {
-    storeFounder();
-    client.setQueryData(LICENSE_QUERY_KEY, FOUNDING);
-    await setup();
-    expect(localStorage.getItem(PERK_KEY)).toBe('1');
-    stateService.put.mockClear();
-    await call(() => client.setQueryData(LICENSE_QUERY_KEY, STANDARD));
-    expect(localStorage.getItem(PERK_KEY)).toBeNull();
-    expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    expect(html).toHaveAttribute('data-bg-light', 'aurora');
-    expect(localStorage.getItem(lsKey('appearance:bgDark'))).toBe(JSON.stringify('founder'));
-    expect(localStorage.getItem(lsKey('appearance:bgLight'))).toBe(JSON.stringify('founder'));
-    const synced = stateService.put.mock.calls.filter(([k]) => String(k).startsWith('appearance:'));
-    expect(synced).toEqual([]);
-  });
-
-  it('a founder preference saved for light only behaves the same, leaving dark untouched', async () => {
-    localStorage.setItem(lsKey('appearance:bgLight'), JSON.stringify('founder'));
-    server.map.set('appearance:bgLight', 'founder');
-    localStorage.setItem(lsKey('appearance:bgDark'), JSON.stringify('ocean'));
-    server.map.set('appearance:bgDark', 'ocean');
-    client.setQueryData(LICENSE_QUERY_KEY, STANDARD);
-    const { result } = await setup();
-    expect(html).toHaveAttribute('data-bg-light', 'aurora');
-    expect(html).toHaveAttribute('data-bg-dark', 'ocean');
-    expect(result.current.founderSaved).toBe(true);
-    await call(() => client.setQueryData(LICENSE_QUERY_KEY, FOUNDING));
-    expect(html).toHaveAttribute('data-bg-light', 'founder');
-    expect(html).toHaveAttribute('data-bg-dark', 'ocean');
-    expect(result.current.founderSaved).toBe(false);
-  });
-
-  it('founderSaved stays false while status is unknown and the cache is empty', async () => {
-    localStorage.setItem(lsKey('appearance:bgDark'), JSON.stringify('founder'));
-    server.map.set('appearance:bgDark', 'founder');
-    licenseService.get.mockReturnValueOnce(new Promise(() => {}));
-    const { result } = await setup();
-    expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    expect(result.current.founderSaved).toBe(false);
-  });
-
-  it('follows the license live: free mid-session falls back, founding restores', async () => {
-    storeFounder();
-    client.setQueryData(LICENSE_QUERY_KEY, FOUNDING);
-    await setup();
-    expect(html).toHaveAttribute('data-bg-light', 'founder');
-    await call(() => client.setQueryData(LICENSE_QUERY_KEY, { perks: { founderBackground: false }, pro: false }));
-    expect(html).toHaveAttribute('data-bg-light', 'aurora');
-    expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    await call(() => client.setQueryData(LICENSE_QUERY_KEY, FOUNDING));
-    expect(html).toHaveAttribute('data-bg-light', 'founder');
-    expect(html).toHaveAttribute('data-bg-dark', 'founder');
+    expect(result.current).not.toHaveProperty('founderUnlocked');
+    expect(result.current).not.toHaveProperty('founderSaved');
   });
 });
 
-describe('Founder background in the real Appearance picker', () => {
+describe('Purple and gold background in the real Appearance picker', () => {
   // A real ThemeProvider feeding the real AppearanceSection, as Settings does.
   function Appearance() {
     const t = useTheme();
@@ -393,60 +259,26 @@ describe('Founder background in the real Appearance picker', () => {
       />
     );
   }
-  const founderRadios = () => screen.queryAllByRole('radio', { name: /^Founder/ });
-  const NOTE = /Your Founder background comes back when a Founding license is active/;
+  const goldRadios = () => screen.queryAllByRole('radio', { name: /^Purple and gold/ });
 
-  function storeFounder() {
-    for (const k of ['appearance:bgDark', 'appearance:bgLight']) {
-      localStorage.setItem(lsKey(k), JSON.stringify('founder'));
-      server.map.set(k, 'founder');
-    }
-  }
-
-  it('unlocks and locks with the license query data, never deleting the saved choice', async () => {
-    storeFounder();
-    client.setQueryData(LICENSE_QUERY_KEY, { perks: { founderBackground: true }, pro: true });
+  it('is offered in both pickers without any license and applies when picked', async () => {
     render(<Appearance />, { wrapper });
     await settled();
-
-    // Unlocked: offered in both pickers, selected, applied, no note.
-    expect(founderRadios()).toHaveLength(2);
-    founderRadios().forEach((r) => expect(r).toBeChecked());
-    expect(html).toHaveAttribute('data-bg-dark', 'founder');
-    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
-
-    // Locked: hidden, default applied and shown as selected, note visible, preference kept.
-    await call(() => client.setQueryData(LICENSE_QUERY_KEY, { perks: { founderBackground: false }, pro: false }));
-    expect(founderRadios()).toHaveLength(0);
+    expect(goldRadios()).toHaveLength(2);
     expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    expect(html).toHaveAttribute('data-bg-light', 'aurora');
-    screen.getAllByRole('radio', { name: /^Aurora/ }).forEach((r) => expect(r).toBeChecked());
-    expect(screen.getByText(NOTE)).toBeInTheDocument();
-    expect(localStorage.getItem(lsKey('appearance:bgDark'))).toBe(JSON.stringify('founder'));
-
-    // Unlocked again: restored.
-    await call(() => client.setQueryData(LICENSE_QUERY_KEY, { perks: { founderBackground: true }, pro: true }));
-    expect(founderRadios()).toHaveLength(2);
-    founderRadios().forEach((r) => expect(r).toBeChecked());
-    expect(html).toHaveAttribute('data-bg-light', 'founder');
-    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
-  });
-
-  it('a founding member can pick Founder from the picker and it applies', async () => {
-    client.setQueryData(LICENSE_QUERY_KEY, { perks: { founderBackground: true }, pro: false });
-    render(<Appearance />, { wrapper });
-    await settled();
-    expect(html).toHaveAttribute('data-bg-dark', 'aurora');
-    await userEvent.setup().click(founderRadios()[0]);
+    await userEvent.setup().click(goldRadios()[0]);
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(html).toHaveAttribute('data-bg-dark', 'founder');
   });
 
-  it('offers no Founder background to a standard license', async () => {
-    client.setQueryData(LICENSE_QUERY_KEY, { perks: { founderBackground: false }, pro: true });
-    render(<Appearance />, { wrapper });
+  it('shows a saved founder choice as selected, with no note about founding or licenses', async () => {
+    for (const k of ['appearance:bgDark', 'appearance:bgLight']) {
+      localStorage.setItem(lsKey(k), JSON.stringify('founder'));
+      server.map.set(k, 'founder');
+    }
+    const { container } = render(<Appearance />, { wrapper });
     await settled();
-    expect(founderRadios()).toHaveLength(0);
-    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    goldRadios().forEach((r) => expect(r).toBeChecked());
+    expect(container.textContent).not.toMatch(/founding|founder|licen[sc]e/i);
   });
 });

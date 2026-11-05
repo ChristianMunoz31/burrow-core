@@ -118,7 +118,7 @@ export const bundleDefine = (version, { channel = 'stable', buildDate, commit = 
     __BURROW_COMMIT__: JSON.stringify(commit ?? null),
     'import.meta.url': '__importMetaUrl',
     __BURROW_APP_VERSION__: JSON.stringify(version),
-    // Consumed by server/license/channelSeam.js (docs/LICENSING.md 4.7).
+    // Consumed by server/license/channelSeam.js.
     __BURROW_RELEASE_BUILD__: 'true',
     __BURROW_CHANNEL__: JSON.stringify(channel),
     __BURROW_DISTRIBUTION__: JSON.stringify(distribution),

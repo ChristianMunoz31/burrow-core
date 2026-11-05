@@ -3,11 +3,11 @@
 // `pattern` is the `<Route path>` value; `path` is the URL the tests open.
 // `heading` is the page's h2 text. `via` is how a person reaches it in the shell: the top bar's
 // `wordmark` (Home, also the first menu row) or `gear` (Settings), the `drawer` (the menu link's name is
-// the heading; `section` is its menu dropdown, `Budget`, `Productivity` or `Health`, and absent for
+// the heading; `section` is its menu dropdown, `Financials`, `Health` or `Productivity`, and absent for
 // Calendar below the divider), or `url` only. `redirectsTo` marks a route that only redirects (App.jsx `<Navigate>`).
 export const ROUTES = Object.freeze([
   { pattern: '/', path: '/', heading: 'Overview', via: 'wordmark' },
-  { pattern: '/budget/*', path: '/budget', heading: 'Budget', via: 'drawer', section: 'Budget' },
+  { pattern: '/budget/*', path: '/budget', heading: 'Budget', via: 'drawer', section: 'Financials' },
   // Redirects to Home (the Javi card there shows the weather).
   { pattern: '/weather', path: '/weather', heading: 'Overview', via: 'url', redirectsTo: '/' },
   { pattern: '/health', path: '/health', heading: 'Sleep & activity', via: 'drawer', section: 'Health' },

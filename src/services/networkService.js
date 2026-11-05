@@ -14,7 +14,7 @@ async function req(path, options = {}) {
 }
 
 /**
- * @typedef {{ id: 'weather'|'oura'|'sheets'|'cloudAi'|'aiLan'|'updates'|'license', enabled: boolean, label: string,
+ * @typedef {{ id: 'weather'|'oura'|'sheets'|'cloudAi'|'aiLan'|'updates', enabled: boolean, label: string,
  *   description: string, hosts: string[] }} NetworkFeature
  */
 

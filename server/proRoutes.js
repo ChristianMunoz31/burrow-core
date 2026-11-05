@@ -1,7 +1,7 @@
 // The public list of every Burrow Pro route (docs/adr/0001-open-core-split.md 3.4). Plain data, frozen. The Pro module
-// can add a handler only for an id listed here, and core mounts the gate for it: requirePro(feature), then the folder
+// can add a handler only for an id listed here, and core mounts it with the folder
 // `pre` helpers, then the module's own validators, then requireAi when `ai` is set, then the module's handlers.
-// Without the module every path here answers requirePro(feature) and then 501 pro_not_included.
+// Without the module every path here answers 501 pro_not_included.
 
 /**
  * @typedef {{ id: string, slot: 'jarvis' | 'insights' | 'folders', method: 'post', path: string, feature: string,

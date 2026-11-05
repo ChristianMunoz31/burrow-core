@@ -37,8 +37,6 @@ function routedFetch(url, init) {
   if (path.startsWith('/api/jarvis/inbox')) return Promise.resolve(jsonResponse({ data: { items: [INBOX_ITEM] } }));
   if (path === '/api/jarvis/conversations') return Promise.resolve(jsonResponse({ id: 'conv-1' }));
   if (path === '/api/jarvis') return jarvisFetch(url, init);
-  // Typed questions run Javi's tools, a Pro capability, so this user has Pro.
-  if (path === '/api/license') return Promise.resolve(jsonResponse({ pro: true, state: 'pro', edition: 'standard', proSource: 'license', trial: null }));
   return Promise.resolve(jsonResponse({ results: [] }));
 }
 

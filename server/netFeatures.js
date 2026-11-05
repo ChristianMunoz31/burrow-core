@@ -69,15 +69,4 @@ export const NETWORK_FEATURES = Object.freeze([
       when: 'Only after you turn it on in Settings > Updates or Settings > Network, or click Check now, which turns it on. Then Burrow checks when you open Settings or click Check now. A desktop app that can install updates by itself asks github.com (the latest.json file). Every other stable copy asks api.github.com (the latest release): that includes the direct download desktop app until in-app install is turned on for it, and a copy you run yourself in a browser, in Docker or with npm start. Clicking Get the installer also reads SHA256SUMS.txt from github.com. Burrow Dev and the Microsoft Store edition make no update request.',
     }),
   }),
-  Object.freeze({
-    id: 'license',
-    label: 'License activation',
-    description:
-      'Contacts Gumroad or Lemon Squeezy only when you click Activate or Move to another computer in Settings > License. Your license key goes to the store you bought from. Clicking one of those buttons turns this on.',
-    hosts: Object.freeze(['api.gumroad.com', 'api.lemonsqueezy.com']),
-    policy: Object.freeze({
-      sent: 'Your license key, the Burrow product id and the setting increment_uses_count=true, which counts this activation (Gumroad), or your license key and the instance name Burrow, or the instance id for a move (Lemon Squeezy). Each request carries the header User-Agent: Burrow. The store also sees your IP address.',
-      when: 'Only when you click Activate or Move to another computer in Settings > License. Burrow never re-checks a license in the background.',
-    }),
-  }),
 ]);

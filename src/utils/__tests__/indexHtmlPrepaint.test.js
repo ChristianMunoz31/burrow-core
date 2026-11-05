@@ -4,7 +4,7 @@ import html from '../../../index.html?raw';
 // Executes the real inline pre-paint script from index.html against jsdom.
 const SCRIPT = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
   .map((m) => m[1])
-  .find((s) => s.includes('founderPerk'));
+  .find((s) => s.includes('data-bg-light'));
 
 const root = document.documentElement;
 const originalMatchMedia = window.matchMedia;
@@ -34,37 +34,21 @@ describe('index.html pre-paint script', () => {
     expect(SCRIPT).toBeTruthy();
   });
 
-  it('applies founder when saved and the perk cache is "1"', () => {
+  it('applies founder when saved, with no license or perk cache involved', () => {
     seed('appearance:bgDark', 'founder');
     seed('appearance:bgLight', 'founder');
-    localStorage.setItem('burrow.license:founderPerk', '1');
     run();
     expect(root.getAttribute('data-bg-dark')).toBe('founder');
     expect(root.getAttribute('data-bg-light')).toBe('founder');
   });
 
-  it('falls back to aurora when founder is saved but there is no cache', () => {
-    seed('appearance:bgDark', 'founder');
-    seed('appearance:bgLight', 'founder');
-    run();
-    expect(root.getAttribute('data-bg-dark')).toBe('aurora');
-    expect(root.getAttribute('data-bg-light')).toBe('aurora');
+  it('does not read any license or perk key', () => {
+    expect(SCRIPT).not.toMatch(/license|founderPerk/i);
   });
 
-  it('treats any cache value other than "1" as absent', () => {
-    seed('appearance:bgDark', 'founder');
-    localStorage.setItem('burrow.license:founderPerk', 'true');
-    run();
-    expect(root.getAttribute('data-bg-dark')).toBe('aurora');
-  });
-
-  it('leaves other presets unaffected with or without the cache', () => {
+  it('leaves other presets unaffected', () => {
     seed('appearance:bgDark', 'ocean');
     seed('appearance:bgLight', 'forest');
-    run();
-    expect(root.getAttribute('data-bg-dark')).toBe('ocean');
-    expect(root.getAttribute('data-bg-light')).toBe('forest');
-    localStorage.setItem('burrow.license:founderPerk', '1');
     run();
     expect(root.getAttribute('data-bg-dark')).toBe('ocean');
     expect(root.getAttribute('data-bg-light')).toBe('forest');
@@ -72,7 +56,6 @@ describe('index.html pre-paint script', () => {
 
   it('sets nothing for an invalid value or when nothing is saved', () => {
     seed('appearance:bgDark', 'nonexistent');
-    localStorage.setItem('burrow.license:founderPerk', '1');
     run();
     expect(root.hasAttribute('data-bg-dark')).toBe(false);
     expect(root.hasAttribute('data-bg-light')).toBe(false);
