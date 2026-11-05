@@ -1,0 +1,75 @@
+# Burrow gitleaks config. Extends the default ruleset; allowlists only synthetic fixtures.
+title = "Burrow gitleaks config"
+
+[extend]
+useDefault = true
+
+# These test files assert that secret redaction works, so they must contain strings shaped like
+# real keys (AWS ids, JWTs, sk_ keys, Authorization headers, *_API_KEY sentinels). Every value
+# is a made-up placeholder. The allowlist is limited to named files and named rules so a real
+# secret pasted anywhere else, or a different rule firing in these files, is still caught.
+[[allowlists]]
+description = "Synthetic secret-shaped fixtures in redaction tests"
+condition = "AND"
+targetRules = ["aws-access-token", "generic-api-key", "jwt", "stripe-access-token", "curl-auth-header"]
+paths = [
+  '''^server/__tests__/(audit|auditHardening|auditIntegration|auditRedaction|aiAuditLocal|exportGuarantees|javiValidate|dataBrowserQuery)\.test\.js$''',
+  '''^src/utils/__tests__/javiRedact\.test\.js$''',
+  '''^src/utils/javiBuilders/__tests__/builders\.matrix\.test\.js$''',
+]
+
+# Public HMAC test vectors for the desktop sidecar handshake (the "secret" is the byte sequence
+# 0x00..0x1f, and RFC 4231 test keys), plus the native dialog vectors derived from the same secret.
+# Limited to these files and the generic rule.
+[[allowlists]]
+description = "Desktop handshake HMAC test vectors"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^server/__tests__/desktopAuth\.test\.js$''',
+  '''^server/__tests__/desktopDialogAuth\.test\.js$''',
+  '''^src-tauri/src/secret\.rs$''',
+]
+
+# Cloud AI scope tests plant made-up sentinel strings (for example SENTINEL_JOURNAL_scope1) in a
+# variable named SECRET to prove withheld data never reaches the fake provider. Limited to the
+# one file and the generic rule.
+[[allowlists]]
+description = "Cloud AI scope test sentinels"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^server/__tests__/cloudScope\.test\.js$''',
+]
+
+# License tests pass synthetic store license keys (constants such as GUMROAD_KEY_2, fixtures built in
+# server/__tests__/license/fixtures/) as `licenseKey`. No real key is ever used in tests (docs/LICENSING.md
+# section 20). Limited to the license test folder and the generic rule.
+[[allowlists]]
+description = "Synthetic store license keys in license tests"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^server/__tests__/license/[^/]+\.(test\.js|js)$''',
+  '''^server/__tests__/license/fixtures/[^/]+\.js$''',
+]
+
+# Updater signing keys. A minisign or Tauri secret key file starts with the comment line "untrusted comment:
+# rsign|minisign [encrypted] secret key" (Tauri writes it base64 encoded as a whole, so the encoded form starts the
+# file), and its key line starts with RWRTY0Iy or RWQAAEIy. The updater PUBLIC key (a "public key" comment) does not
+# match. The signing key never belongs in the repo: docs/RELEASING.md keeps it outside every repo.
+[[rules]]
+id = "burrow-minisign-secret-key"
+description = "minisign or Tauri updater signing secret key"
+regex = '''(?m)(?:untrusted comment: (?:rsign|minisign) (?:encrypted )?secret key|dW50cnVzdGVkIGNvbW1lbnQ6I(?:HJzaWdu|G1pbmlzaWdu)(?:IGVuY3J5cHRl|IHNlY3JldCBr)|^(?:RWRTY0Iy|RWQAAEIy)[A-Za-z0-9+/=]{40,}$)'''
+keywords = ["secret key", "dw50cnvz", "rwrty0iy", "rwqaaeiy"]
+
+# The sidecar diagnostics test plants a made-up launch secret (synthetic-launch-secret-...) to prove it never reaches
+# the diagnostics output. Limited to this one file and the generic rule.
+[[allowlists]]
+description = "Synthetic launch secret in the sidecar diagnostics test"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^server/__tests__/smokeSidecarDiagnostics\.test\.js$''',
+]

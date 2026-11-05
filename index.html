@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Burrow</title>
+    <meta name="description" content="Burrow is a local-first personal data OS. Your data stays on this device." />
+    <meta name="application-name" content="Burrow" />
+    <script>
+      // Pre-paint theme/background so there is no flash before React mounts.
+      // Keys (with the `burrow.` prefix from src/utils/storageKeys.js) and preset ids mirror
+      // SETTINGS_KEYS and BACKGROUND_PRESETS in src/constants/settingsDefaults.js; keep them in sync.
+      (function () {
+        try {
+          var root = document.documentElement;
+          var read = function (key) {
+            var raw = localStorage.getItem(key);
+            if (raw === null) return null;
+            try {
+              return JSON.parse(raw);
+            } catch (e) {
+              return raw;
+            }
+          };
+          var theme = read('burrow.theme');
+          var light =
+            theme === 'light' ||
+            ((theme !== 'dark') &&
+              typeof window.matchMedia === 'function' &&
+              window.matchMedia('(prefers-color-scheme: light)').matches);
+          if (light) root.classList.add('light');
+          var presets = ['aurora', 'ocean', 'sunset', 'forest', 'graphite', 'solid', 'founder'];
+          // 'founder' is applied only while the cached last-known founder perk is '1'
+          // (src/utils/founderPerkCache.js); otherwise the default preset ('aurora', see
+          // SETTINGS_DEFAULTS bgLight/bgDark) is used. React then applies the real flag.
+          var founderOk = localStorage.getItem('burrow.license:founderPerk') === '1';
+          var pick = function (value) {
+            if (value === 'founder' && !founderOk) return 'aurora';
+            return presets.indexOf(value) !== -1 ? value : null;
+          };
+          var bgLight = pick(read('burrow.appearance:bgLight'));
+          var bgDark = pick(read('burrow.appearance:bgDark'));
+          if (bgLight) root.setAttribute('data-bg-light', bgLight);
+          if (bgDark) root.setAttribute('data-bg-dark', bgDark);
+        } catch (e) {
+          /* storage or matchMedia unavailable: React applies the theme on mount */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

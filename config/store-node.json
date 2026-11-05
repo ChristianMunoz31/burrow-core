@@ -1,0 +1,9 @@
+{
+  "_help": "Pinned sha256 of official Node.js Windows builds, per Node version. pins: the win-x64/node.exe. scripts/release/storeNode.mjs uses it to build the x64 sidecar on an ARM64 PC (Microsoft Store build and the x64 cross-build of the self-hosted runner): it refuses a download or a cached copy that does not match, and refuses a Node version with no entry here unless you pass --x64-node <file>. arm64ZipPins: the node-<version>-win-arm64.zip that scripts/runner/install-node.sh installs per job on the self-hosted runner (docs/SELF_HOSTED_RUNNER.md); it uses the newest version that has an entry in BOTH lists, so the arm64 node that builds the sidecar and the injected x64 node.exe are always the same version. To add a version: copy the win-x64/node.exe and node-<version>-win-arm64.zip lines for it from https://nodejs.org/dist/<version>/SHASUMS256.txt, and compare them with the hashes of files you downloaded yourself. This file is build tooling only; it is not read by the app and is not baked into any build.",
+  "pins": {
+    "v24.15.0": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5"
+  },
+  "arm64ZipPins": {
+    "v24.15.0": "c9eb7402eda26e2ba7e44b6727fc85a8de56c5095b1f71ebd3062892211aa116"
+  }
+}

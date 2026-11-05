@@ -1,0 +1,46 @@
+[package]
+name = "burrow-desktop"
+version = "0.1.0"
+description = "Burrow desktop shell (Tauri v2): starts the local Burrow server and shows its UI."
+edition = "2021"
+rust-version = "1.77"
+publish = false
+
+[lib]
+name = "burrow_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "Burrow"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+# native-tls (Windows SChannel) instead of the default rustls+ring: ring needs clang to build on ARM64 Windows.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy", "zip"] }
+reqwest = { version = "0.13.5", default-features = false }
+base64 = "0.22"
+sha2 = "0.10"
+hmac = "0.12"
+getrandom = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_JobObjects", "Win32_System_Threading"] }
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+opt-level = "s"
+panic = "abort"

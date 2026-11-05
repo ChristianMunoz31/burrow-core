@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Burrow keeps your data on your computer. No accounts, no telemetry. Every outbound connection is listed here.">
+<meta name="robots" content="index,follow">
+<title>Burrow privacy policy</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#1c2230;--muted:#505a6e;--line:#d6dbe4;--card:#f5f7fa;--link:#0b5cad}
+@media (prefers-color-scheme:dark){:root{--bg:#10141c;--fg:#e6e9ef;--muted:#a3adc0;--line:#2b3445;--card:#182030;--link:#7db4f0}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:46rem;margin:0 auto;padding:2rem 1.25rem 4rem}
+h1{font-size:1.9rem;line-height:1.2;margin:0 0 .25rem}
+h2{font-size:1.25rem;margin:2.25rem 0 .5rem;border-top:1px solid var(--line);padding-top:1.25rem}
+h3{font-size:1.05rem;margin:0 0 .35rem}
+a{color:var(--link)}
+code{font:.9em ui-monospace,Consolas,monospace;background:var(--card);padding:.1em .35em;border-radius:4px}
+.meta{color:var(--muted);margin:0 0 1.5rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:1rem 1.15rem;margin:0 0 1rem}
+.card p{margin:.3rem 0}
+.k{font-weight:600}
+ul{padding-left:1.25rem}
+footer{margin-top:3rem;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+<h1>Burrow privacy policy</h1>
+<p class="meta">Version 1.2. Effective 2026-10-11. Applies to Burrow: Private Life Organizer, the Windows app from Neural Foundry, both the Microsoft Store edition and the direct download edition.</p>
+
+<h2>Who we are</h2>
+<p>Burrow is made by Neural Foundry, an individual developer. Contact: <a href="mailto:burrowsupport@gmail.com">burrowsupport@gmail.com</a>.</p>
+
+<h2>The short version</h2>
+<ul>
+<li>Your data stays on your computer: <code>%APPDATA%\Burrow</code> for the direct download edition, and <code>%USERPROFILE%\Burrow Data</code> (inside your user folder) for the Microsoft Store edition.</li>
+<li>No accounts. No telemetry. No analytics. The developer does not receive your data.</li>
+<li>Burrow does not contact the internet on its own. Every feature that does is off until you turn it on in Settings &gt; Network or click a button for it.</li>
+<li>The Network activity page in Settings &gt; Privacy &amp; activity lists recent outbound connections Burrow has made. Burrow keeps that list for 90 days.</li>
+</ul>
+
+<h2>Every connection Burrow can make</h2>
+<p>This list is generated from the same registry that the Network page in the app uses, so the two cannot disagree. Each feature is off by default.</p>
+<section class="card" id="weather">
+<h3>Weather (<code>weather</code>)</h3>
+<p><span class="k">Connects to:</span> <code>api.open-meteo.com</code></p>
+<p><span class="k">What is sent:</span> Your latitude and longitude, rounded to 2 decimals (about 1 km).</p>
+<p><span class="k">When:</span> Only while Weather is turned on in Settings &gt; Network, when Burrow loads the forecast, including for Javi's daily briefing.</p>
+<p><span class="k">What the app tells you:</span> Fetches the forecast for your coordinates from Open-Meteo. Your latitude and longitude are sent.</p>
+</section>
+<section class="card" id="oura">
+<h3>Oura Ring (<code>oura</code>)</h3>
+<p><span class="k">Connects to:</span> <code>api.ouraring.com</code></p>
+<p><span class="k">What is sent:</span> Your Oura personal token, so Oura can return your sleep, readiness and activity.</p>
+<p><span class="k">When:</span> Only while Oura Ring is turned on in Settings &gt; Network, when Burrow reads your Oura data or when you test a saved token.</p>
+<p><span class="k">What the app tells you:</span> Pulls sleep, readiness and activity from your Oura account using your personal token. Also lets you test a saved token.</p>
+</section>
+<section class="card" id="sheets">
+<h3>Google Sheets import (<code>sheets</code>)</h3>
+<p><span class="k">Connects to:</span> <code>docs.google.com</code>, <code>*.googleusercontent.com</code></p>
+<p><span class="k">What is sent:</span> A request for the published sheet link you pasted. Nothing else from Burrow.</p>
+<p><span class="k">When:</span> Only when you paste a link and click Load sheet.</p>
+<p><span class="k">What the app tells you:</span> Lets you import transactions from a published Google Sheet link on the Budget page. Burrow only contacts Google (docs.google.com and googleusercontent.com) when you paste a link and choose Load sheet.</p>
+</section>
+<section class="card" id="cloudAi">
+<h3>Cloud AI provider (<code>cloudAi</code>)</h3>
+<p><span class="k">Connects to:</span> <code>the endpoint you set in Settings &gt; AI</code></p>
+<p><span class="k">What is sent:</span> Your prompts and the data Javi reads, limited to the data categories you allow, and your own API key as the credential. Data that has no category (weather results, and the advice Javi gives on the Settings page) is not limited by those choices and can be sent whenever cloud AI is on.</p>
+<p><span class="k">When:</span> Only after you choose a cloud provider in Settings &gt; AI, save its address, model and key, and accept the two-checkbox consent there. Accepting the consent turns this on; you can switch it off again in Settings &gt; Network. It is off by default.</p>
+<p><span class="k">What the app tells you:</span> Use a cloud AI provider (sends data off your computer). Prompts and the data Javi reads go to the endpoint you set.</p>
+</section>
+<section class="card" id="aiLan">
+<h3>Ollama on another computer (<code>aiLan</code>)</h3>
+<p><span class="k">Connects to:</span> <code>the Ollama address you set in Settings &gt; AI</code></p>
+<p><span class="k">What is sent:</span> Your prompts and the data Javi reads, to the computer you named.</p>
+<p><span class="k">When:</span> Only after you set that address in Settings &gt; AI and turn this on in Settings &gt; Network. It is off by default.</p>
+<p><span class="k">What the app tells you:</span> Use an Ollama server on another computer. Prompts and the data Javi reads go to that computer.</p>
+</section>
+<section class="card" id="updates">
+<h3>Update check (<code>updates</code>)</h3>
+<p><span class="k">Connects to:</span> <code>github.com</code>, <code>release-assets.githubusercontent.com</code>, <code>objects.githubusercontent.com</code>, <code>api.github.com</code></p>
+<p><span class="k">What is sent:</span> Nothing about you or your data. GitHub sees your IP address, like any website you visit.</p>
+<p><span class="k">When:</span> Only after you turn it on in Settings &gt; Updates or Settings &gt; Network, or click Check now, which turns it on. Then Burrow checks when you open Settings or click Check now. A desktop app that can install updates by itself asks github.com (the latest.json file). Every other stable copy asks api.github.com (the latest release): that includes the direct download desktop app until in-app install is turned on for it, and a copy you run yourself in a browser, in Docker or with npm start. Clicking Get the installer also reads SHA256SUMS.txt from github.com. Burrow Dev and the Microsoft Store edition make no update request.</p>
+<p><span class="k">What the app tells you:</span> Checks GitHub for a newer Burrow when you click Check now in Settings &gt; Updates, or when you open Settings while this is on, and shows what's new. Nothing is downloaded until you click Download and install. Then Burrow saves a backup, and the Burrow app downloads the installer from GitHub, checks its signature and restarts to install it. A copy that can't install updates by itself shows the installer's checksum from GitHub instead: when you click Get the installer, Burrow reads the checksum file (SHA256SUMS.txt) from GitHub and saves a backup, and your browser downloads the installer. Nothing about you or your data is sent; GitHub sees your IP address like any website.</p>
+</section>
+<section class="card" id="license">
+<h3>License activation (<code>license</code>)</h3>
+<p><span class="k">Connects to:</span> <code>api.gumroad.com</code>, <code>api.lemonsqueezy.com</code></p>
+<p><span class="k">What is sent:</span> Your license key, the Burrow product id and the setting increment_uses_count=true, which counts this activation (Gumroad), or your license key and the instance name Burrow, or the instance id for a move (Lemon Squeezy). Each request carries the header User-Agent: Burrow. The store also sees your IP address.</p>
+<p><span class="k">When:</span> Only when you click Activate or Move to another computer in Settings &gt; License. Burrow never re-checks a license in the background.</p>
+<p><span class="k">What the app tells you:</span> Contacts Gumroad or Lemon Squeezy only when you click Activate or Move to another computer in Settings &gt; License. Your license key goes to the store you bought from. Clicking one of those buttons turns this on.</p>
+</section>
+
+<h2>Downloading an AI model</h2>
+<p>By default, Javi (the assistant) talks only to Ollama on your own computer (<code>127.0.0.1</code>). Burrow does not install Ollama. If you click Get Ollama, your browser opens ollama.com. When you click Download model, Ollama, not Burrow, downloads the model from the Ollama library. Burrow makes no internet call for it.</p>
+
+<h2>Cloud AI with your own key</h2>
+<p>Cloud AI is off by default. If you turn it on, Burrow sends prompts and the data Javi reads to the endpoint you chose, using your own API key, and only for the data categories you allow. Budget, todos, calendar, habits, bookmarks, countdowns and focus are on by default once cloud is enabled; health, notes, journal and the files of folders you add are off until you allow them. A few items have no data category, so those choices do not limit them: weather results that Javi looks up, and the advice Javi gives on the Settings page. They can be sent whenever cloud AI is on. You accept a consent screen first, and you pay the provider yourself. Saved API keys are stored encrypted on your computer and are not included in backups or exports.</p>
+
+<h2>Links that send nothing from Burrow</h2>
+<p>The Buy Burrow Pro button opens the seller's page in your default browser. The Report content link in Javi and the Help menu opens your default mail app with an empty message to <a href="mailto:burrowsupport@gmail.com">burrowsupport@gmail.com</a>. Burrow itself sends nothing for these. If you send the email, your mail provider and we receive what you write.</p>
+
+<h2>Microsoft Store</h2>
+<p>If you installed Burrow from the Microsoft Store, Microsoft may collect data about the install, purchase and updates under the <a href="https://privacy.microsoft.com/privacystatement">Microsoft privacy statement</a>. Burrow does not receive that data. The Store edition delivers updates through the Store and makes no update request itself.</p>
+
+<h2>Purchases</h2>
+<p>Burrow Pro is sold by Gumroad or Lemon Squeezy, which handle checkout, tax and refunds under their own privacy policies. They hold your purchase details, not Burrow.</p>
+
+<h2>Deleting your data</h2>
+<ul>
+<li>In Burrow, open Settings &gt; Data &amp; storage &gt; Danger zone and choose Erase all my data. It asks you to confirm, offers an export first and can delete backups too.</li>
+<li>Uninstalling Burrow does not delete your data folder, so your data survives a reinstall. To remove everything, uninstall Burrow and then delete its data folder: <code>%APPDATA%\Burrow</code> for the direct download edition, <code>%USERPROFILE%\Burrow Data</code> for the Microsoft Store edition (paste the path into the File Explorer address bar).</li>
+</ul>
+
+<h2>Children</h2>
+<p>Burrow collects no personal information from anyone, including children, because it collects no information at all. Anything a child enters stays on that computer.</p>
+
+<h2>Changes to this policy</h2>
+<p>If the way Burrow handles data changes, this page changes with it and the version and effective date above are updated. Any new outbound connection must be added to the registry that produces the list above, so it appears here before it ships.</p>
+
+<h2>Contact</h2>
+<p>Questions: <a href="mailto:burrowsupport@gmail.com">burrowsupport@gmail.com</a>.</p>
+<footer>Generated from the Burrow network feature registry. Version 1.2.</footer>
+</main>
+</body>
+</html>

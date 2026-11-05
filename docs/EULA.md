@@ -1,0 +1,51 @@
+# Burrow end-user license notice for official builds
+
+> **Draft, needs legal review. Not in force.** This text is a starting point for the owner and a lawyer. Do not ship it, link it or quote it in public copy until it has been reviewed. Preconditions before first use: the dependency license audit run by Team S (ADR R13, `THIRD_PARTY_NOTICES.md` and `npm ls --omit=dev --all`: no GPL, AGPL or LGPL package in the shipped bundles) is clean, and the owner has reviewed this draft. See [PUBLISHING_CORE.md](PUBLISHING_CORE.md).
+
+Applies to official Burrow builds (the Windows installers and the Microsoft Store package) that combine two parts:
+
+1. **Burrow core**, which is planned to be licensed under the GNU Affero General Public License, version 3 only (AGPL-3.0-only), with a source offer once the public core repository exists.
+2. **The Burrow Pro module**, which is proprietary software, shipped only compiled inside official builds.
+
+Burrow is made by the Burrow authors ("we"). "You" is the person who installs or uses Burrow.
+
+## 1. Burrow core
+
+The core is licensed to you under AGPL-3.0-only. Once the owner has published the core repository, this notice will say where to get the source of the core in each official build, and that offer covers the core only. Nothing in this notice limits the rights the AGPL gives you for the core. Before the public repository exists, the core is not published and this section is a plan.
+
+## 2. The Pro module
+
+The Pro module is not covered by the AGPL. We keep all rights in it.
+
+- You may use the Pro module only as part of an official Burrow build, on the terms of this notice and of your Burrow Pro license.
+- You may not copy, extract, redistribute, sublicense, rent, reverse engineer or modify the Pro module, except where the law gives you that right regardless of this notice.
+- The Pro module is not redistributable. If you build Burrow from the published core source, you get a build without the Pro module (a Free build). It still works and keeps all of your data.
+- The Pro module can only use the public, audited core APIs. This rule is enforced in our build.
+
+## 3. Your Burrow Pro license
+
+- **Perpetual.** A Burrow Pro license does not expire. Pro keeps working in every version released during your update window, forever.
+- **One year of updates.** Standard and Family licenses include updates until one year after the purchase date. The Founding edition includes two years. Student and nonprofit licenses are yearly and renewable. Pro features released after your update window need a newer Burrow Pro license. Everything in Burrow Free is unaffected, and bug fixes are never gated. The exact rule (build date against the "updates until" date, and the per-feature rule of the Microsoft Store build) is in [LICENSING.md](LICENSING.md) sections 6 and 6.1.
+- **Activation.** You activate a license key once from Settings > License. Burrow contacts the store only when you activate or move a license.
+- **Trial.** Every data folder gets a 14-day trial of Pro features automatically. In a build without the Pro module, the app says that Pro features are not included in this build.
+- **Editions and limits.** Editions, prices and activation limits are listed in [LICENSING.md](LICENSING.md) and on the store page at the time of purchase.
+
+## 4. Your data is never paywalled
+
+Your data is yours. Export, import, backups and privacy controls are free in every build and stay free, with or without a Pro license, with or without the Pro module. Data that you created with a Pro feature stays readable and exportable if Pro stops. Only Pro actions stop.
+
+## 5. No warranty and liability
+
+The software is provided "as is", without warranty of any kind, to the extent the law allows. The core's warranty disclaimer is in the AGPL. To the extent the law allows, we are not liable for indirect or consequential loss, and our total liability for the Pro module is limited to the price you paid for your Burrow Pro license. Your statutory consumer rights are not affected.
+
+## 6. Third-party software
+
+Burrow includes third-party components under their own licenses. They are listed in `THIRD_PARTY_NOTICES.md`, which ships with each build.
+
+## 7. Open items for the legal review
+
+- Governing law, venue and the notice contact address.
+- The wording of the liability limit and the consumer-rights clause for each region sold to.
+- Whether the Microsoft Store standard application license terms need a supplement.
+- Whether the AGPL source offer needs to appear in the installer, in Settings, or both, and its exact text after the public repo exists.
+- Confirmation from the dependency license audit that no copyleft dependency is statically bundled in the shipped builds (ADR R13).

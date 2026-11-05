@@ -1,0 +1,1153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Static mesh background ──────────────────────────────────────────────────
+ * A few large, soft radial-gradient blobs painted on the fixed #bg-layer, over
+ * the theme's --body-bg. Deliberately static: animating content underneath a
+ * backdrop-filter forces a re-blur every frame, and filter:blur elements are
+ * expensive. The glass surfaces refract these blobs, which is what makes the
+ * blur read as glass instead of a flat translucent fill.
+ * Dark: warm amber (top-left), muted indigo (right), teal (bottom).
+ * Light: pale indigo, sky and peach. Blob alphas are capped so the glass
+ * tokens below keep WCAG AA text contrast over the brightest blob area.
+ */
+#bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    /* Blob colors (--mesh-c1..3) and geometry (--mesh-g1..3) come from :root. */
+    background-image:
+        radial-gradient(var(--mesh-g1), var(--mesh-c1), transparent 62%),
+        radial-gradient(var(--mesh-g2), var(--mesh-c2), transparent 62%),
+        radial-gradient(var(--mesh-g3), var(--mesh-c3), transparent 62%);
+}
+
+/* ── Hover lift utility ──────────────────────────────────────────────────────
+ * Cards/tiles elevate on hover with transform + shadow expansion.
+ * GPU-composited (transform only), no layout shift. Do not use on glass
+ * (blurred) surfaces; use .glass-hover there.
+ */
+.hover-lift {
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+                box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+:root.light .hover-lift:hover {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+/* ── Scroll-driven entrance animations ───────────────────────────────────────
+ * Section headings and cards animate in as they scroll into view.
+ * Falls back gracefully — invisible content just shows immediately.
+ */
+@supports (animation-timeline: view()) {
+    .scroll-reveal {
+        animation: section-enter linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 30%;
+    }
+    @keyframes section-enter {
+        from { opacity: 0; transform: translateY(16px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+}
+
+/* ── Glass surfaces ──────────────────────────────────────────────────────────
+ * Every glass class = token background + 1px token border + inset top highlight
+ * + soft layered shadow. Radius is NOT baked in (outer cards add rounded-2xl).
+ * Blurred: glass, glass-dense, glass-strong (+ a small blur on glass-overlay).
+ * Never nest a blurred class inside another blurred element; inner tiles use
+ * glass-subtle / glass-input, which do not blur.
+ * Kept in @layer components so Tailwind utilities (rounded-*, border-*, p-*)
+ * still override them. The fallbacks below swap the tokens, not the classes.
+ */
+@layer components {
+    .glass {
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        box-shadow: var(--glass-highlight), var(--glass-shadow);
+        -webkit-backdrop-filter: var(--glass-filter);
+        backdrop-filter: var(--glass-filter);
+    }
+    .glass-dense {
+        background: var(--glass-bg-dense);
+        border: 1px solid var(--glass-border);
+        box-shadow: var(--glass-highlight), var(--glass-shadow);
+        -webkit-backdrop-filter: var(--glass-filter);
+        backdrop-filter: var(--glass-filter);
+    }
+    .glass-strong {
+        background: var(--glass-bg-strong);
+        border: 1px solid var(--glass-border-strong);
+        box-shadow: var(--glass-highlight), var(--glass-shadow);
+        -webkit-backdrop-filter: var(--glass-filter);
+        backdrop-filter: var(--glass-filter);
+    }
+    /* Strong-glass look without blur, for panels nested in the blurred
+       glass-overlay scrim (a backdrop root): near-solid bg, no backdrop-filter. */
+    .glass-flat {
+        background: var(--glass-bg-flat);
+        border: 1px solid var(--glass-border-strong);
+        box-shadow: var(--glass-highlight), var(--glass-shadow);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+    /* Opaque popup menu inside a blurred card: the flat tint over the solid surface
+       (defined for every theme preset), so nothing behind shows through. No blur. */
+    .glass-menu {
+        background: linear-gradient(var(--glass-bg-flat), var(--glass-bg-flat)), var(--surface-solid-strong);
+        border: 1px solid var(--glass-border-strong);
+        box-shadow: var(--glass-highlight), var(--glass-shadow);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+    /* Nested tile/row inside a glass card. No blur. */
+    .glass-subtle {
+        background: var(--glass-bg-subtle);
+        border: 1px solid var(--glass-border);
+        box-shadow: var(--glass-highlight);
+    }
+    /* Hover emphasis for interactive glass cards (border + shadow, no transform). */
+    .glass-hover {
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .glass-hover:hover {
+        border-color: var(--glass-border-strong);
+        box-shadow: var(--glass-highlight), var(--glass-shadow-hover);
+    }
+    /* Scrim behind modals/drawers: dim + light blur. */
+    .glass-overlay {
+        background: var(--glass-overlay);
+        -webkit-backdrop-filter: var(--glass-overlay-filter);
+        backdrop-filter: var(--glass-overlay-filter);
+    }
+    /* Text inputs, selects, textareas, search fields. No blur. */
+    .glass-input {
+        background: var(--glass-input-bg);
+        border: 1px solid var(--glass-input-border);
+        box-shadow: var(--glass-highlight);
+        color: rgb(var(--slate-100));
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .glass-input::placeholder {
+        color: rgb(var(--slate-400));
+        opacity: 1;
+    }
+    /* Native select popups ignore the translucent fill on Windows Chrome. */
+    .glass-input option {
+        background-color: var(--surface-solid-strong);
+        color: rgb(var(--slate-100));
+    }
+    .glass-input:hover:not(:disabled) {
+        border-color: var(--glass-input-border-hover);
+    }
+    .glass-input:focus,
+    .glass-input:focus-visible {
+        border-color: var(--focus-ring);
+        box-shadow: var(--glass-highlight), 0 0 0 3px var(--focus-ring-soft);
+        outline: 2px solid transparent; /* keeps a visible outline in forced-colors mode */
+        outline-offset: 0;
+    }
+    .glass-input:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
+    /* Javi advisor panel: a see-through blurred shell (one blur layer; everything inside
+       is non-blurred). Tokens live in :root so the solid fallbacks only swap tokens. */
+    .glass-javi {
+        background: var(--javi-sheen), var(--javi-bg);
+        border: 1px solid var(--javi-border);
+        box-shadow: var(--javi-highlight), var(--javi-shadow);
+        -webkit-backdrop-filter: var(--javi-filter);
+        backdrop-filter: var(--javi-filter);
+    }
+    /* Header and thread are near-clear (hairline divider only). Any text sitting on them
+       gets its own denser, non-blurred backing (chip / inner / user / composer) so it
+       keeps AA contrast without raising the shell opacity. */
+    .glass-javi-head {
+        background: var(--javi-head-bg);
+        border-bottom: 1px solid var(--javi-edge);
+    }
+    .glass-javi-body {
+        background: var(--javi-body-bg);
+    }
+    /* Assistant bubble. */
+    .glass-javi-inner {
+        background: var(--javi-inner-bg);
+        border: 1px solid var(--javi-edge);
+    }
+    /* Links in assistant bubbles: the global .prose-jarvis link colour fails AA on light. */
+    .glass-javi-inner .prose-jarvis a {
+        color: rgb(var(--acc-indigo));
+    }
+    /* Small backing pill for header text/icons, empty state and errors. */
+    .glass-javi-chip {
+        background: var(--javi-chip-bg);
+        border: 1px solid var(--javi-edge);
+    }
+    /* Suggested prompts: lighter than the chip, secondary to the composer. */
+    .glass-javi-suggest {
+        background: var(--javi-suggest-bg);
+        border: 1px solid var(--javi-suggest-border);
+    }
+    /* User bubble: accent-tinted. */
+    .glass-javi-user {
+        background: rgb(var(--javi-user-rgb) / var(--javi-user-a));
+        border: 1px solid var(--javi-user-border);
+    }
+    /* Composer dock pinned under the thread, separated by a hairline. */
+    .glass-javi-dock {
+        border-top: 1px solid var(--javi-edge);
+    }
+    /* Composer: dense, non-blurred; glows on :focus-within (the textarea is the focus target). */
+    .glass-javi-composer {
+        background: var(--javi-composer-bg);
+        border: 1px solid var(--javi-composer-border);
+        box-shadow: var(--javi-highlight);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .glass-javi-composer:focus-within {
+        border-color: var(--focus-ring);
+        box-shadow: var(--javi-highlight), 0 0 0 3px var(--focus-ring-soft), 0 0 12px 2px var(--javi-glow);
+        outline: 2px solid transparent; /* keeps a visible outline in forced-colors mode */
+        outline-offset: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .glass-javi-composer,
+        .glass-javi-bar {
+            transition: none;
+        }
+    }
+    .glass-javi-send {
+        background: var(--javi-send-bg);
+        color: var(--javi-send-fg);
+    }
+    .glass-javi-send:hover:not(:disabled) {
+        background: var(--javi-send-bg-hover);
+    }
+    /* Javi bar (docked bottom-right): translucent glass, accent ring on hover. */
+    .glass-javi-bar {
+        background: var(--javi-fab-bg);
+        border: 1px solid var(--javi-border);
+        box-shadow: var(--javi-highlight), var(--javi-shadow);
+        -webkit-backdrop-filter: var(--javi-filter);
+        backdrop-filter: var(--javi-filter);
+        transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .glass-javi-bar:hover {
+        border-color: var(--javi-fab-ring);
+        box-shadow: var(--javi-highlight), 0 0 0 2px var(--javi-fab-ring), var(--javi-shadow);
+    }
+    /* Toasts sit above the Javi bar, and left of (desktop) or above (narrow) the open window. */
+    /* :where() keeps this rule at the same specificity as the media rules below, so they win when the window is open. */
+    :root:has(.glass-javi-bar:not(:where(.hidden)), .glass-javi) {
+        --javi-toast-offset: 3.5rem;
+    }
+    @media (min-width: 640px) {
+        :root:has(.glass-javi) {
+            --javi-toast-offset: 1rem;
+            --javi-toast-right: 26rem;
+        }
+    }
+    @media (max-width: 639.98px) {
+        :root:has(.glass-javi) {
+            --javi-toast-offset: calc(85dvh + 0.5rem);
+        }
+    }
+    /* Row actions that appear on hover/focus for mouse users; always visible on touch. */
+    @media (hover: hover) and (pointer: fine) {
+        .reveal-on-hover {
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .group:hover .reveal-on-hover,
+        .reveal-on-hover:focus-within {
+            opacity: 1;
+        }
+    }
+}
+
+/*
+ * Dark theme is the default (no class on <html>). Light theme is activated by
+ * adding `class="light"` to <html>; ThemeContext does this.
+ *
+ * The slate scale is mirrored across themes so every `slate-slateXXX` Tailwind
+ * class flips correctly: in dark mode 800 is dark and 100 is light text; in
+ * light mode the same names point at the inverted values (800 becomes light
+ * surface, 100 becomes dark text). Components don't change.
+ */
+/*
+ * Warm "sepia" neutral scale (replaces the old cool blue-slate). The hue is a
+ * soft taupe/charcoal so neither theme uses pure black or pure white — gentler
+ * on the eyes. Luminance is kept monotonic across the scale so component depth
+ * ordering and contrast behave exactly as before; only the hue changed.
+ */
+:root {
+    /* Sticky top bar height; TopBar overwrites it with the measured value. */
+    --topbar-h: 56px;
+    color-scheme: dark;
+    /* dark = warm charcoal surfaces, warm off-white text */
+    --slate-50: 245 238 226;
+    --slate-100: 236 228 214;
+    --slate-200: 228 219 204;
+    --slate-300: 214 203 186;
+    --slate-400: 171 158 140;
+    --slate-500: 168 155 138; /* >= 4.56:1 on glass, worst preset (aurora), spatial model; stays just under slate-400 */
+    --slate-600: 99 88 75;
+    --slate-700: 74 65 55;
+    --slate-800: 48 42 35;
+    --slate-900: 33 28 23;
+    --slate-950: 22 19 16;
+    --body-bg: radial-gradient(ellipse at top left, rgb(52, 44, 36) 0%, rgb(30, 26, 22) 50%, rgb(22, 19, 16) 100%);
+    --body-text: rgb(230, 223, 210);
+    --scroll-track: rgb(30, 26, 22);
+    --scroll-thumb: rgb(74, 65, 55);
+    --scroll-thumb-hover: rgb(99, 88, 75);
+
+    /*
+     * Glass tokens (dark). Tints are the warm charcoal slate-800/900.
+     * Contrast (slate-400 text 171/158/140), worst case over the brightest amber
+     * blob (~57/48/37 backdrop): glass 4.9, dense 5.2, strong 5.2, input/subtle
+     * are darker wells so they only raise it. Tooltip text on tooltip-bg: >13.
+     */
+    --glass-bg: rgba(52, 45, 38, 0.66);
+    --glass-bg-dense: rgba(44, 38, 32, 0.86);
+    --glass-bg-strong: rgba(40, 35, 29, 0.9);
+    --glass-bg-flat: rgba(40, 35, 29, 0.94);
+    --glass-bg-subtle: rgba(22, 19, 16, 0.3);
+    --glass-input-bg: rgba(22, 19, 16, 0.45);
+    --glass-border: rgba(255, 240, 220, 0.11);
+    --glass-border-strong: rgba(255, 240, 220, 0.2);
+    --glass-input-border: rgba(171, 158, 140, 0.75); /* 4.0:1 on input fill, 3.4:1 on card (WCAG 1.4.11) */
+    --glass-input-border-hover: rgba(214, 203, 186, 0.75);
+    --glass-highlight: inset 0 1px 0 rgba(255, 245, 230, 0.08);
+    --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -4px rgba(0, 0, 0, 0.35), 0 20px 48px -12px rgba(0, 0, 0, 0.3);
+    --glass-shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.3), 0 12px 32px -4px rgba(0, 0, 0, 0.45), 0 28px 56px -14px rgba(0, 0, 0, 0.35);
+    --glass-blur: 18px;
+    --glass-saturate: 1.5;
+    --glass-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    --glass-overlay: rgba(14, 12, 10, 0.55);
+    --glass-overlay-filter: blur(4px);
+    --tooltip-bg: rgba(26, 22, 18, 0.96);
+    --tooltip-border: rgba(255, 240, 220, 0.18);
+    --tooltip-text: rgb(236, 228, 214);
+    --surface-solid: rgb(47, 41, 34);
+    --surface-solid-strong: rgb(40, 35, 29);
+    --focus-ring: rgb(165, 180, 252); /* indigo-300: 6.3:1 on glass, 8.5:1 on page */
+    --focus-ring-soft: rgba(165, 180, 252, 0.45);
+
+    /*
+     * Javi advisor panel (dark): 20% shell, 20px blur, saturate 1.5. Header and thread are
+     * near-clear; all text sits on denser non-blurred backings (chip .80, bubble .80, user
+     * .82, suggest .68, composer .90). Backdrop envelope checked: brightest preset blob, busy
+     * (150,145,140) patch, and a pure-white patch. Text >= 4.5:1 across all three (worst case
+     * is the white patch: ~4.8:1 for slate-400 on chip); UI parts >= 3:1. Verified numerically.
+     */
+    --javi-bg: rgba(30, 26, 21, 0.2);
+    --javi-sheen: linear-gradient(180deg, rgba(99, 102, 241, 0.07) 0%, rgba(99, 102, 241, 0) 38%);
+    --javi-head-bg: rgba(18, 15, 12, 0.04);
+    --javi-body-bg: rgba(18, 15, 12, 0);
+    --javi-inner-bg: rgba(18, 15, 12, 0.8);
+    --javi-chip-bg: rgba(18, 15, 12, 0.8);
+    --javi-suggest-bg: rgba(18, 15, 12, 0.8);
+    --javi-suggest-border: rgba(255, 240, 220, 0.3);
+    --javi-user-rgb: 49 46 129;
+    --javi-user-a: 0.82;
+    --javi-user-border: rgba(165, 180, 252, 0.3);
+    --javi-composer-bg: rgba(18, 15, 12, 0.9);
+    --javi-composer-border: rgba(171, 158, 140, 0.75);
+    --javi-glow: rgba(165, 180, 252, 0.35);
+    --javi-send-bg: rgb(79, 70, 229);
+    --javi-send-bg-hover: rgb(99, 102, 241);
+    --javi-send-fg: rgb(255, 255, 255);
+    --javi-border: rgba(255, 240, 220, 0.3);
+    --javi-edge: rgba(255, 240, 220, 0.12);
+    --javi-highlight: inset 0 1px 0 rgba(255, 245, 230, 0.2);
+    --javi-shadow: 0 2px 4px rgba(0, 0, 0, 0.25), 0 12px 28px -6px rgba(0, 0, 0, 0.4), 0 28px 64px -16px rgba(0, 0, 0, 0.45);
+    --javi-filter: blur(20px) saturate(1.5);
+    --javi-fab-bg: rgba(18, 15, 12, 0.8);
+    --javi-fab-ring: rgba(165, 180, 252, 0.7);
+
+    /*
+     * Adaptive accent tokens for COLORED TEXT (e.g. value figures, score
+     * numbers, status labels). In dark mode these equal the pale `*Light1`
+     * accents the design already uses (so dark mode is unchanged); in light
+     * mode they flip to saturated/dark accents that stay legible on the
+     * near-white card surface. Wired into Tailwind as `text-accent-<name>`.
+     * Decorative accent uses (bg/border/gradient) keep the fixed `*Light1`
+     * tokens — only text was unreadable in light mode.
+     */
+    --acc-green: 154 224 149;
+    --acc-red: 255 166 193;
+    --acc-yellow: 255 214 107;
+    --acc-orange: 255 182 142;
+    --acc-cyan: 136 219 255;
+    --acc-purple: 191 174 252;
+    --acc-teal: 116 235 225;
+    --acc-blue: 160 198 255;
+    --acc-fuchsia: 232 121 249;
+    --acc-amber: 251 191 36;
+    --acc-indigo: 165 180 252;
+
+    /* Recharts axis ticks / legends (warm slate, matches current palette) */
+    --chart-tick: 171 158 140;
+    --chart-tick-strong: 214 203 186;
+}
+
+:root.light {
+    color-scheme: light;
+    /*
+     * Neutral SaaS palette. Surface tokens are pure white -> gray-25 -> gray-100
+     * (cards read white on a faint gray page); text tokens are the cool gray
+     * ramp (gray-900 -> gray-400). The slate scale is inverted: low numbers are
+     * dark text, high numbers are light surfaces.
+     */
+    --slate-50: 17 24 39;
+    --slate-100: 31 41 55;
+    --slate-200: 55 65 81;
+    --slate-300: 75 85 99;
+    --slate-400: 90 98 112;
+    --slate-500: 107 114 128; /* 4.7:1 on glass worst case (was 2.5:1) */
+    --slate-600: 209 213 219;
+    --slate-700: 229 231 235;
+    --slate-800: 255 255 255;
+    --slate-900: 249 250 251;
+    --slate-950: 243 244 246;
+    --body-bg: radial-gradient(ellipse at top left, rgb(249, 250, 251) 0%, rgb(243, 244, 246) 50%, rgb(243, 244, 246) 100%);
+    --body-text: rgb(31, 41, 55);
+    --scroll-track: rgb(243, 244, 246);
+    --scroll-thumb: rgb(209, 213, 219);
+    --scroll-thumb-hover: rgb(156, 163, 175);
+
+    /*
+     * Glass tokens (light): near-white glass over a soft cool-gray page.
+     * slate-400 body text (107/114/128) needs a surface of luminance >= 0.93.
+     * Worst case = glass 0.80 over the darkest (indigo) blob: backdrop 232/238/253
+     * -> ~253/254/255: 4.9:1 text. dense 0.93 / strong 0.95 >= 4.8:1.
+     * Subtle stays white (0.7) over an already-white card: >= 4.7:1.
+     */
+    --glass-bg: rgba(255, 255, 255, 0.8);
+    --glass-bg-dense: rgba(255, 255, 255, 0.93);
+    --glass-bg-strong: rgba(255, 255, 255, 0.95);
+    --glass-bg-flat: rgba(255, 255, 255, 0.97);
+    --glass-bg-subtle: rgba(255, 255, 255, 0.7);
+    --glass-input-bg: rgba(255, 255, 255, 0.85);
+    --glass-border: rgba(17, 24, 39, 0.1);
+    --glass-border-strong: rgba(17, 24, 39, 0.16);
+    --glass-input-border: rgba(107, 114, 128, 0.85); /* 3.5:1 on input fill and card (WCAG 1.4.11) */
+    --glass-input-border-hover: rgba(75, 85, 99, 0.9);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    --glass-shadow: 0 1px 2px rgba(17, 24, 39, 0.05), 0 8px 24px -6px rgba(31, 41, 55, 0.1), 0 18px 40px -14px rgba(31, 41, 55, 0.1);
+    --glass-shadow-hover: 0 2px 4px rgba(17, 24, 39, 0.06), 0 12px 30px -6px rgba(31, 41, 55, 0.16), 0 24px 48px -16px rgba(31, 41, 55, 0.14);
+    --glass-blur: 16px;
+    --glass-saturate: 1.5;
+    --glass-overlay: rgba(17, 24, 39, 0.3);
+    --tooltip-bg: rgba(255, 255, 255, 0.97);
+    --tooltip-border: rgba(17, 24, 39, 0.14);
+    --tooltip-text: rgb(31, 41, 55);
+    --surface-solid: rgb(255, 255, 255);
+    --surface-solid-strong: rgb(255, 255, 255);
+    --focus-ring: rgb(79, 70, 229); /* indigo-600: 5.7-6.3:1 on white and page */
+    --focus-ring-soft: rgba(79, 70, 229, 0.45);
+
+    /*
+     * Javi advisor panel (light): 30% shell, 20px blur, saturate 1.5. Header and thread are
+     * near-clear; all text sits on denser non-blurred backings (chip .88, bubble .84, user
+     * .88, suggest .80, composer .94). Backdrop envelope checked: white, darkest preset blob,
+     * and a busy (96,100,180) saturated patch. Text >= 4.5:1 across all three (placeholder
+     * uses slate-400, ~5.8:1 worst case); UI parts >= 3:1. Verified numerically.
+     */
+    --javi-bg: rgba(255, 255, 255, 0.3);
+    --javi-sheen: linear-gradient(180deg, rgba(99, 102, 241, 0.05) 0%, rgba(99, 102, 241, 0) 38%);
+    --javi-head-bg: rgba(255, 255, 255, 0.05);
+    --javi-body-bg: rgba(255, 255, 255, 0);
+    --javi-inner-bg: rgba(255, 255, 255, 0.84);
+    --javi-chip-bg: rgba(255, 255, 255, 0.88);
+    --javi-suggest-bg: rgba(255, 255, 255, 0.8);
+    /* slate-500: 4.8:1 against the chip over white, 3.7:1 over a busy patch, 3.3:1 over the darkest blob. */
+    --javi-suggest-border: rgb(var(--slate-500));
+    --javi-user-rgb: 224 231 255;
+    --javi-user-a: 0.88;
+    --javi-user-border: rgba(79, 70, 229, 0.28);
+    --javi-composer-bg: rgba(255, 255, 255, 0.94);
+    --javi-composer-border: rgba(107, 114, 128, 0.85);
+    --javi-glow: rgba(79, 70, 229, 0.3);
+    --javi-send-bg: rgb(79, 70, 229);
+    --javi-send-bg-hover: rgb(67, 56, 202);
+    --javi-send-fg: rgb(255, 255, 255);
+    --javi-border: rgba(17, 24, 39, 0.22);
+    --javi-edge: rgba(17, 24, 39, 0.08);
+    --javi-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    --javi-shadow: 0 2px 4px rgba(17, 24, 39, 0.06), 0 12px 28px -6px rgba(31, 41, 55, 0.16), 0 28px 64px -16px rgba(31, 41, 55, 0.2);
+    --javi-fab-bg: rgba(255, 255, 255, 0.72);
+    --javi-fab-ring: rgba(79, 70, 229, 0.75);
+    /* Light-mode accent text: dark hues, legible (WCAG AA) as text on white cards. --acc-green is
+       4 108 78 so the "Ollama is running" chip (15% green over the card) stays >= 4.5:1. */
+    --acc-green: 4 108 78;
+    --acc-red: 185 28 28;
+    --acc-yellow: 180 83 9;
+    --acc-orange: 194 65 12;
+    --acc-cyan: 14 116 144;
+    --acc-purple: 109 40 217;
+    --acc-teal: 15 118 110;
+    --acc-blue: 29 78 216;
+    --acc-fuchsia: 162 28 175;
+    --acc-amber: 180 83 9;
+    --acc-indigo: 67 56 202;
+
+    /* Recharts ticks: neutral gray-500 / gray-700 on the light chart surface */
+    --chart-tick: 107 114 128;
+    --chart-tick-strong: 55 65 81;
+}
+
+/*
+ * Background presets. Each preset's three blob COLORS are authored once as
+ * --mesh-<preset>-<theme>-<n> vars. Geometry is shared by every preset and lives
+ * in --mesh-g1..3 (vmax sizes, for the fixed #bg-layer; set per theme above). The
+ * active preset is selected by pointing --mesh-c1..3 at one color set. The picker
+ * swatches (.bg-swatch) read the same color vars with their own % geometry, so a
+ * preview can never drift from the page.
+ * ThemeContext (and the inline script in index.html) set data-bg-dark /
+ * data-bg-light on <html>; aurora is the default (the original mesh) and needs
+ * no attribute rule. "solid" is no mesh at all (transparent blobs).
+ *
+ * Contrast envelope: every preset keeps slate-400 AND slate-500 text on the
+ * `glass` surface at >= 4.5:1 under the spatial model (real gradient falloff,
+ * all three blobs, several viewport sizes), both themes. Keep blob alphas inside
+ * this envelope when editing. prefers-contrast: more and
+ * prefers-reduced-transparency remove the mesh entirely (see the fallbacks below).
+ */
+:root {
+    --mesh-g1: 60vmax 48vmax at 6% 0%;
+    --mesh-g2: 52vmax 44vmax at 96% 42%;
+    --mesh-g3: 50vmax 38vmax at 38% 108%;
+
+    --mesh-aurora-dark-1: rgba(217, 152, 72, 0.16);
+    --mesh-aurora-dark-2: rgba(99, 102, 170, 0.20);
+    --mesh-aurora-dark-3: rgba(45, 160, 150, 0.14);
+    --mesh-aurora-light-1: rgba(165, 180, 252, 0.35);
+    --mesh-aurora-light-2: rgba(125, 211, 252, 0.28);
+    --mesh-aurora-light-3: rgba(253, 186, 140, 0.26);
+
+    --mesh-ocean-dark-1: rgba(56, 130, 200, 0.18);
+    --mesh-ocean-dark-2: rgba(80, 90, 180, 0.18);
+    --mesh-ocean-dark-3: rgba(40, 170, 190, 0.14);
+    --mesh-ocean-light-1: rgba(125, 190, 250, 0.34);
+    --mesh-ocean-light-2: rgba(165, 180, 252, 0.28);
+    --mesh-ocean-light-3: rgba(110, 220, 230, 0.26);
+
+    --mesh-sunset-dark-1: rgba(225, 110, 80, 0.16);
+    --mesh-sunset-dark-2: rgba(170, 70, 130, 0.18);
+    --mesh-sunset-dark-3: rgba(225, 150, 60, 0.12);
+    --mesh-sunset-light-1: rgba(253, 186, 140, 0.34);
+    --mesh-sunset-light-2: rgba(251, 170, 200, 0.28);
+    --mesh-sunset-light-3: rgba(252, 211, 120, 0.26);
+
+    --mesh-forest-dark-1: rgba(70, 160, 100, 0.16);
+    --mesh-forest-dark-2: rgba(40, 130, 120, 0.18);
+    --mesh-forest-dark-3: rgba(150, 160, 70, 0.12);
+    --mesh-forest-light-1: rgba(134, 239, 172, 0.32);
+    --mesh-forest-light-2: rgba(110, 210, 190, 0.28);
+    --mesh-forest-light-3: rgba(190, 220, 150, 0.26);
+
+    --mesh-graphite-dark-1: rgba(190, 190, 190, 0.08);
+    --mesh-graphite-dark-2: rgba(150, 150, 160, 0.10);
+    --mesh-graphite-dark-3: rgba(200, 200, 200, 0.06);
+    --mesh-graphite-light-1: rgba(156, 163, 175, 0.30);
+    --mesh-graphite-light-2: rgba(209, 213, 219, 0.30);
+    --mesh-graphite-light-3: rgba(148, 163, 184, 0.24);
+
+    /* Founder (Founding licenses only): brand purple #8b5cf6, deep #5b21b6, gold #fde68a.
+       Much bolder than the other presets on purpose: the glass tokens are overridden for
+       Founder below (denser, purple-tinted), so the text contrast envelope still holds. */
+    --mesh-founder-dark-1: rgba(150, 95, 235, 0.32);
+    --mesh-founder-dark-2: rgba(124, 58, 237, 0.46);
+    --mesh-founder-dark-3: rgba(253, 200, 90, 0.34);
+    --mesh-founder-light-1: rgba(196, 181, 253, 0.62);
+    --mesh-founder-light-2: rgba(167, 139, 250, 0.42);
+    --mesh-founder-light-3: rgba(252, 211, 100, 0.58);
+    /* Flat deep-violet (dark) / cream-to-lavender (light) wash over the page base. */
+    --founder-wash-dark: linear-gradient(160deg, rgba(62, 22, 125, 0.62) 0%, rgba(40, 14, 88, 0.58) 55%, rgba(26, 9, 58, 0.62) 100%);
+    --founder-wash-light: linear-gradient(160deg, rgba(255, 244, 214, 0.85) 0%, rgba(245, 238, 255, 0.8) 55%, rgba(233, 224, 255, 0.85) 100%);
+    /* Warm light spilling out of the burrow mouth (bottom right). */
+    --founder-glow-dark: radial-gradient(60vmax 42vmax at 90% 110%, rgba(253, 214, 110, 0.42), transparent 66%);
+    --founder-glow-light: radial-gradient(60vmax 42vmax at 90% 110%, rgba(250, 196, 70, 0.35), transparent 66%);
+    /* Opaque flat wash for reduced transparency. */
+    --founder-wash-flat-dark: #1c0f3a;
+    --founder-wash-flat-light: #f1eaff;
+    /* Burrow motif: concentric tunnel arches around a glowing mouth, bottom-right only. */
+    --founder-motif-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='60 66 480 234' fill='none' stroke='%23fde68a' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M226 300A74 74 0 0 1 374 300' stroke-opacity='.5'/%3E%3Cpath d='M186 300A114 114 0 0 1 414 300' stroke-opacity='.45'/%3E%3Cpath d='M146 300A154 154 0 0 1 454 300' stroke-opacity='.32'/%3E%3Cpath d='M106 300A194 194 0 0 1 494 300' stroke-opacity='.2'/%3E%3Cpath d='M66 300A234 234 0 0 1 534 300' stroke-opacity='.09'/%3E%3Cpath d='M262 300A38 38 0 0 1 338 300Z' fill='%23fde68a' fill-opacity='.3' stroke='none'/%3E%3C/svg%3E");
+    --founder-motif-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='60 66 480 234' fill='none' stroke='%236d28d9' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M226 300A74 74 0 0 1 374 300' stroke-opacity='.30'/%3E%3Cpath d='M186 300A114 114 0 0 1 414 300' stroke-opacity='.24'/%3E%3Cpath d='M146 300A154 154 0 0 1 454 300' stroke-opacity='.18'/%3E%3Cpath d='M106 300A194 194 0 0 1 494 300' stroke-opacity='.12'/%3E%3Cpath d='M66 300A234 234 0 0 1 534 300' stroke-opacity='.08'/%3E%3Cpath d='M262 300A38 38 0 0 1 338 300Z' fill='%23fbbf24' fill-opacity='.20' stroke='none'/%3E%3C/svg%3E");
+    /* Diagonal gold sheen (::after) and the top bar's gold edge. */
+    --founder-sheen: rgba(253, 230, 138, 0.14);
+    --founder-edge: rgba(253, 230, 138, 0.85);
+
+    --mesh-c1: var(--mesh-aurora-dark-1);
+    --mesh-c2: var(--mesh-aurora-dark-2);
+    --mesh-c3: var(--mesh-aurora-dark-3);
+}
+:root.light {
+    --founder-sheen: rgba(250, 190, 60, 0.2);
+    --founder-edge: rgba(202, 138, 4, 0.9);
+    --mesh-g1: 58vmax 46vmax at 4% 0%;
+    --mesh-g2: 52vmax 44vmax at 98% 38%;
+    --mesh-g3: 50vmax 38vmax at 36% 108%;
+    --mesh-c1: var(--mesh-aurora-light-1);
+    --mesh-c2: var(--mesh-aurora-light-2);
+    --mesh-c3: var(--mesh-aurora-light-3);
+}
+
+/* Active preset for the page (per theme) and for each picker swatch. */
+:root:not(.light)[data-bg-dark='ocean'],
+.bg-swatch[data-variant='dark'][data-preset='ocean'] {
+    --mesh-c1: var(--mesh-ocean-dark-1); --mesh-c2: var(--mesh-ocean-dark-2); --mesh-c3: var(--mesh-ocean-dark-3);
+}
+:root.light[data-bg-light='ocean'],
+.bg-swatch[data-variant='light'][data-preset='ocean'] {
+    --mesh-c1: var(--mesh-ocean-light-1); --mesh-c2: var(--mesh-ocean-light-2); --mesh-c3: var(--mesh-ocean-light-3);
+}
+:root:not(.light)[data-bg-dark='sunset'],
+.bg-swatch[data-variant='dark'][data-preset='sunset'] {
+    --mesh-c1: var(--mesh-sunset-dark-1); --mesh-c2: var(--mesh-sunset-dark-2); --mesh-c3: var(--mesh-sunset-dark-3);
+}
+:root.light[data-bg-light='sunset'],
+.bg-swatch[data-variant='light'][data-preset='sunset'] {
+    --mesh-c1: var(--mesh-sunset-light-1); --mesh-c2: var(--mesh-sunset-light-2); --mesh-c3: var(--mesh-sunset-light-3);
+}
+:root:not(.light)[data-bg-dark='forest'],
+.bg-swatch[data-variant='dark'][data-preset='forest'] {
+    --mesh-c1: var(--mesh-forest-dark-1); --mesh-c2: var(--mesh-forest-dark-2); --mesh-c3: var(--mesh-forest-dark-3);
+}
+:root.light[data-bg-light='forest'],
+.bg-swatch[data-variant='light'][data-preset='forest'] {
+    --mesh-c1: var(--mesh-forest-light-1); --mesh-c2: var(--mesh-forest-light-2); --mesh-c3: var(--mesh-forest-light-3);
+}
+:root:not(.light)[data-bg-dark='graphite'],
+.bg-swatch[data-variant='dark'][data-preset='graphite'] {
+    --mesh-c1: var(--mesh-graphite-dark-1); --mesh-c2: var(--mesh-graphite-dark-2); --mesh-c3: var(--mesh-graphite-dark-3);
+}
+:root.light[data-bg-light='graphite'],
+.bg-swatch[data-variant='light'][data-preset='graphite'] {
+    --mesh-c1: var(--mesh-graphite-light-1); --mesh-c2: var(--mesh-graphite-light-2); --mesh-c3: var(--mesh-graphite-light-3);
+}
+:root:not(.light)[data-bg-dark='founder'],
+.bg-swatch[data-variant='dark'][data-preset='founder'] {
+    --mesh-c1: var(--mesh-founder-dark-1); --mesh-c2: var(--mesh-founder-dark-2); --mesh-c3: var(--mesh-founder-dark-3);
+    --founder-wash: var(--founder-wash-dark); --founder-wash-flat: var(--founder-wash-flat-dark); --founder-glow: var(--founder-glow-dark); --founder-motif: var(--founder-motif-dark);
+}
+:root.light[data-bg-light='founder'],
+.bg-swatch[data-variant='light'][data-preset='founder'] {
+    --mesh-c1: var(--mesh-founder-light-1); --mesh-c2: var(--mesh-founder-light-2); --mesh-c3: var(--mesh-founder-light-3);
+    --founder-wash: var(--founder-wash-light); --founder-wash-flat: var(--founder-wash-flat-light); --founder-glow: var(--founder-glow-light); --founder-motif: var(--founder-motif-light);
+}
+
+/* Founder glass: denser, purple-tinted (dark) or whiter (light) surfaces with a faint gold
+   (dark) or violet (light) border, so text keeps WCAG AA over the much stronger backdrop.
+   The fallbacks further down (no backdrop-filter, reduced transparency, increased contrast)
+   list these selectors too and win by order. */
+:root:not(.light)[data-bg-dark='founder'] {
+    --glass-bg: rgba(30, 20, 52, 0.78);
+    --glass-bg-dense: rgba(28, 19, 48, 0.9);
+    --glass-bg-strong: rgba(26, 18, 45, 0.93);
+    --glass-bg-flat: rgba(26, 18, 45, 0.95);
+    --glass-border: rgba(253, 230, 138, 0.16);
+    --glass-border-strong: rgba(253, 230, 138, 0.26);
+    /* Secondary text sits straight on the violet backdrop in places (page subtitles), so lift
+       the two muted text tokens a little to keep >= 4.5:1 there. */
+    --slate-400: 186 174 156;
+    --slate-500: 182 170 152;
+}
+:root.light[data-bg-light='founder'] {
+    --glass-bg: rgba(255, 255, 255, 0.86);
+    --glass-bg-dense: rgba(255, 255, 255, 0.94);
+    --glass-bg-strong: rgba(255, 255, 255, 0.96);
+    --glass-bg-flat: rgba(255, 255, 255, 0.97);
+    --glass-border: rgba(109, 40, 217, 0.16);
+    --glass-border-strong: rgba(109, 40, 217, 0.24);
+}
+
+/* Founder layers on the fixed #bg-layer. The wash, warm glow and mesh are the layer's own
+   background (painted at first paint, no animation); ::before is only the burrow motif, a
+   small corner accent masked to fade toward the top and left so it never reaches the
+   content; ::after is one diagonal gold sheen (a 900ms fade-in, none under reduced motion;
+   animating under backdrop-filter re-blurs every frame). Scoped to the founder selectors,
+   so no other preset pays for the pseudo-elements. */
+:root:not(.light)[data-bg-dark='founder'] #bg-layer,
+:root.light[data-bg-light='founder'] #bg-layer {
+    background-image:
+        var(--founder-glow),
+        var(--founder-wash),
+        radial-gradient(var(--mesh-g1), var(--mesh-c1), transparent 62%),
+        radial-gradient(var(--mesh-g2), var(--mesh-c2), transparent 62%),
+        radial-gradient(var(--mesh-g3), var(--mesh-c3), transparent 62%);
+}
+:root:not(.light)[data-bg-dark='founder'] #bg-layer::before,
+:root.light[data-bg-light='founder'] #bg-layer::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: min(30vmax, 440px, 70vw);
+    aspect-ratio: 480 / 234;
+    background: var(--founder-motif) no-repeat center / 100% 100%;
+    -webkit-mask-image: linear-gradient(to top left, #000 30%, transparent 92%);
+    mask-image: linear-gradient(to top left, #000 30%, transparent 92%);
+}
+@media (max-width: 639px) {
+    :root:not(.light)[data-bg-dark='founder'] #bg-layer::before,
+    :root.light[data-bg-light='founder'] #bg-layer::before {
+        width: min(52vw, 220px);
+        opacity: 0.55;
+    }
+}
+:root:not(.light)[data-bg-dark='founder'] #bg-layer::after,
+:root.light[data-bg-light='founder'] #bg-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 34%, var(--founder-sheen) 50%, transparent 66%);
+    animation: founder-sheen-in 900ms ease-out both;
+}
+@keyframes founder-sheen-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+    :root:not(.light)[data-bg-dark='founder'] #bg-layer::after,
+    :root.light[data-bg-light='founder'] #bg-layer::after {
+        animation: none;
+    }
+}
+
+/* Founder: a thin gold edge on the top bar (the sticky header, already positioned so the
+   pseudo-element anchors to it). Hooked by [data-topbar] set in TopBar.jsx. */
+:root:not(.light)[data-bg-dark='founder'] [data-topbar]::after,
+:root.light[data-bg-light='founder'] [data-topbar]::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent 0%, var(--founder-edge) 18%, var(--founder-edge) 82%, transparent 100%);
+}
+
+:root:not(.light)[data-bg-dark='solid'],
+:root.light[data-bg-light='solid'],
+.bg-swatch[data-preset='solid'] {
+    --mesh-c1: transparent; --mesh-c2: transparent; --mesh-c3: transparent;
+}
+.bg-swatch[data-variant='dark'][data-preset='aurora'] {
+    --mesh-c1: var(--mesh-aurora-dark-1); --mesh-c2: var(--mesh-aurora-dark-2); --mesh-c3: var(--mesh-aurora-dark-3);
+}
+.bg-swatch[data-variant='light'][data-preset='aurora'] {
+    --mesh-c1: var(--mesh-aurora-light-1); --mesh-c2: var(--mesh-aurora-light-2); --mesh-c3: var(--mesh-aurora-light-3);
+}
+
+/* The picker swatch previews the founder wash, mesh, glow and motif (not the sheen). */
+/* Picker swatch tile: the variant's body base color plus a scaled-down mesh. The
+   page's vmax radii would cover the whole tile, so the same colors are laid out
+   with % radii. The stack is doubled so the low-alpha page blobs read as a
+   preview at this size (the page itself is seen through glass). */
+.bg-swatch {
+    background-color: var(--swatch-base);
+    background-image:
+        radial-gradient(70% 90% at 6% 0%, var(--mesh-c1), transparent 62%),
+        radial-gradient(60% 90% at 96% 42%, var(--mesh-c2), transparent 62%),
+        radial-gradient(60% 80% at 38% 108%, var(--mesh-c3), transparent 62%),
+        radial-gradient(70% 90% at 6% 0%, var(--mesh-c1), transparent 62%),
+        radial-gradient(60% 90% at 96% 42%, var(--mesh-c2), transparent 62%),
+        radial-gradient(60% 80% at 38% 108%, var(--mesh-c3), transparent 62%);
+}
+.bg-swatch[data-preset='founder'] {
+    background-image:
+        var(--founder-motif),
+        radial-gradient(70% 90% at 6% 0%, var(--mesh-c1), transparent 62%),
+        radial-gradient(60% 90% at 96% 42%, var(--mesh-c2), transparent 62%),
+        radial-gradient(60% 80% at 38% 108%, var(--mesh-c3), transparent 62%),
+        var(--founder-glow),
+        var(--founder-wash);
+    background-repeat: no-repeat;
+    background-position: right 4% bottom 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+    background-size: 78% auto, auto, auto, auto, auto, auto;
+}
+.bg-swatch[data-variant='dark'] { --swatch-base: rgb(36, 31, 26); }
+.bg-swatch[data-variant='light'] { --swatch-base: rgb(245, 246, 248); }
+
+/*
+ * Glass fallbacks. Same token overrides in three cases: no backdrop-filter
+ * support, reduced transparency, and increased contrast. Surfaces become solid
+ * (no blur, no see-through); contrast mode also gets stronger borders. The
+ * selector list beats `:root.light` by order (same specificity, later wins).
+ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root,
+    :root.light,
+    :root:not(.light)[data-bg-dark='founder'],
+    :root.light[data-bg-light='founder'] {
+        --glass-bg: var(--surface-solid);
+        --glass-bg-dense: var(--surface-solid-strong);
+        --glass-bg-strong: var(--surface-solid-strong);
+        --glass-bg-flat: var(--surface-solid-strong);
+        --glass-filter: none;
+        --glass-overlay-filter: none;
+        --javi-bg: var(--surface-solid-strong);
+        --javi-sheen: linear-gradient(transparent, transparent);
+        --javi-head-bg: var(--surface-solid-strong);
+        --javi-body-bg: var(--surface-solid-strong);
+        --javi-inner-bg: var(--surface-solid);
+        --javi-fab-bg: var(--surface-solid-strong);
+        --javi-chip-bg: var(--surface-solid-strong);
+        --javi-suggest-bg: var(--surface-solid);
+        --javi-user-a: 1;
+        --javi-composer-bg: var(--surface-solid-strong);
+        --javi-filter: none;
+    }
+}
+@media (prefers-reduced-transparency: reduce) {
+    :root,
+    :root.light,
+    :root:not(.light)[data-bg-dark='founder'],
+    :root.light[data-bg-light='founder'] {
+        --glass-bg: var(--surface-solid);
+        --glass-bg-dense: var(--surface-solid-strong);
+        --glass-bg-strong: var(--surface-solid-strong);
+        --glass-bg-flat: var(--surface-solid-strong);
+        --glass-filter: none;
+        --glass-overlay-filter: none;
+        --javi-bg: var(--surface-solid-strong);
+        --javi-sheen: linear-gradient(transparent, transparent);
+        --javi-head-bg: var(--surface-solid-strong);
+        --javi-body-bg: var(--surface-solid-strong);
+        --javi-inner-bg: var(--surface-solid);
+        --javi-fab-bg: var(--surface-solid-strong);
+        --javi-chip-bg: var(--surface-solid-strong);
+        --javi-suggest-bg: var(--surface-solid);
+        --javi-user-a: 1;
+        --javi-composer-bg: var(--surface-solid-strong);
+        --javi-filter: none;
+        --javi-edge: rgb(var(--slate-500) / 0.5);
+    }
+    #bg-layer,
+    .bg-swatch,
+    .bg-swatch[data-preset='founder'],
+    :root:not(.light)[data-bg-dark='founder'] #bg-layer,
+    :root.light[data-bg-light='founder'] #bg-layer {
+        background-image: none;
+    }
+    /* Founder keeps an opaque flat wash color; only the motif, glow and sheen go. */
+    :root:not(.light)[data-bg-dark='founder'] #bg-layer,
+    :root.light[data-bg-light='founder'] #bg-layer {
+        background-color: var(--founder-wash-flat);
+    }
+    #bg-layer::before,
+    #bg-layer::after {
+        display: none;
+    }
+}
+@media (prefers-contrast: more) {
+    :root,
+    :root.light,
+    :root:not(.light)[data-bg-dark='founder'],
+    :root.light[data-bg-light='founder'] {
+        --glass-bg: var(--surface-solid);
+        --glass-bg-dense: var(--surface-solid-strong);
+        --glass-bg-strong: var(--surface-solid-strong);
+        --glass-bg-flat: var(--surface-solid-strong);
+        --glass-filter: none;
+        --glass-overlay-filter: none;
+        --javi-bg: var(--surface-solid-strong);
+        --javi-sheen: linear-gradient(transparent, transparent);
+        --javi-head-bg: var(--surface-solid-strong);
+        --javi-body-bg: var(--surface-solid-strong);
+        --javi-inner-bg: var(--surface-solid);
+        --javi-fab-bg: var(--surface-solid-strong);
+        --javi-chip-bg: var(--surface-solid-strong);
+        --javi-suggest-bg: var(--surface-solid);
+        --javi-user-a: 1;
+        --javi-composer-bg: var(--surface-solid-strong);
+        --javi-filter: none;
+        --javi-border: rgb(var(--slate-400));
+        --javi-edge: rgb(var(--slate-400));
+        --javi-composer-border: rgb(var(--slate-400));
+        --javi-suggest-border: rgb(var(--slate-400));
+        --javi-user-border: rgb(var(--slate-400));
+        --javi-fab-ring: rgb(var(--slate-400));
+        --glass-border: rgb(var(--slate-400));
+        --glass-border-strong: rgb(var(--slate-400));
+        --glass-input-border: rgb(var(--slate-400));
+        --glass-input-border-hover: rgb(var(--slate-200));
+        --tooltip-border: rgb(var(--slate-400));
+    }
+    #bg-layer,
+    .bg-swatch,
+    .bg-swatch[data-preset='founder'],
+    :root:not(.light)[data-bg-dark='founder'] #bg-layer,
+    :root.light[data-bg-light='founder'] #bg-layer {
+        background-image: none;
+    }
+    #bg-layer::before,
+    #bg-layer::after,
+    [data-topbar]::after {
+        display: none;
+    }
+}
+/* Forced colors: no founder decoration paints (the system palette wins). */
+@media (forced-colors: active) {
+    #bg-layer,
+    .bg-swatch,
+    .bg-swatch[data-preset='founder'],
+    :root:not(.light)[data-bg-dark='founder'] #bg-layer,
+    :root.light[data-bg-light='founder'] #bg-layer {
+        background-image: none;
+    }
+    #bg-layer::before,
+    #bg-layer::after,
+    :root:not(.light)[data-bg-dark='founder'] [data-topbar]::after,
+    :root.light[data-bg-light='founder'] [data-topbar]::after {
+        display: none;
+        background: none;
+    }
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--body-bg);
+    background-attachment: fixed;
+    color: var(--body-text);
+    letter-spacing: -0.01em;
+}
+
+input[type='date'] {
+    color-scheme: inherit;
+}
+
+.font-mono,
+code,
+pre {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Visible keyboard-focus ring, theme-aware (indigo-600 in light, indigo-300 in
+   dark; both >= 3:1 on the glass surfaces and the page). :focus-visible only
+   triggers for keyboard/programmatic focus, so mouse clicks stay ring-free.
+   No forced border-radius: outlines follow the element's own radius, so rounded
+   glass cards keep their corners while focused. */
+*:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+/* Recharts tooltip: sits inside blurred cards, so it is near-opaque and uses NO
+   backdrop-filter. bg/border keep !important so inline contentStyle values
+   can't fight the theme tokens. Item colors come from the series/itemStyle. */
+.recharts-default-tooltip {
+    background-color: var(--tooltip-bg) !important;
+    border: 1px solid var(--tooltip-border) !important;
+    border-radius: 10px !important;
+    box-shadow: var(--glass-shadow);
+    color: var(--tooltip-text);
+}
+.recharts-tooltip-label {
+    color: var(--tooltip-text);
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+/* Lightweight markdown styling for Jarvis answers + the daily briefing (no
+   typography plugin). Tight spacing so it reads well inside cards/popovers. */
+.prose-jarvis > :first-child {
+    margin-top: 0;
+}
+.prose-jarvis > :last-child {
+    margin-bottom: 0;
+}
+.prose-jarvis p {
+    margin: 0.4em 0;
+}
+.prose-jarvis ul,
+.prose-jarvis ol {
+    margin: 0.4em 0;
+    padding-left: 1.2em;
+}
+.prose-jarvis ul {
+    list-style: disc;
+}
+.prose-jarvis ol {
+    list-style: decimal;
+}
+.prose-jarvis li {
+    margin: 0.15em 0;
+}
+/* Javi advice: bullets are action items, shown as highlighted rows with an accent bar. */
+.prose-jarvis ul.javi-actions {
+    list-style: none;
+    padding-left: 0;
+}
+.prose-jarvis ul.javi-actions > li {
+    margin: 0.3em 0;
+    padding: 0.3em 0.65em;
+    border-left: 3px solid rgb(var(--acc-indigo));
+    border-radius: 0 6px 6px 0;
+    background: rgb(var(--acc-indigo) / 0.12);
+    font-weight: 500;
+}
+/* A list nested in an action row is a plain bulleted list, not more tinted rows. */
+.prose-jarvis ul.javi-actions ul.javi-actions {
+    list-style: disc;
+    padding-left: 1.25em;
+}
+.prose-jarvis ul.javi-actions ul.javi-actions > li {
+    margin: 0.15em 0;
+    padding: 0;
+    border-left: 0;
+    border-radius: 0;
+    background: none;
+    font-weight: inherit;
+}
+.prose-jarvis h1,
+.prose-jarvis h2,
+.prose-jarvis h3 {
+    font-weight: 600;
+    margin: 0.6em 0 0.3em;
+}
+.prose-jarvis code {
+    background: var(--slate-800, rgba(120, 120, 120, 0.18));
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+.prose-jarvis a {
+    color: rgb(132, 119, 219);
+    text-decoration: underline;
+}
+.prose-jarvis strong {
+    font-weight: 600;
+}
+
+/*
+ * Shell motion. The mobile nav drawer and route content animate in with
+ * GPU-friendly transforms/opacity (no layout-affecting properties), so phones
+ * get a smooth slide/fade instead of a hard pop-in. Durations are short to keep
+ * the UI feeling snappy rather than sluggish.
+ */
+@keyframes drawer-slide-in {
+    from {
+        transform: translate3d(-100%, 0, 0);
+    }
+    to {
+        transform: translate3d(0, 0, 0);
+    }
+}
+@keyframes overlay-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+@keyframes page-fade-in {
+    /* Transform-only: an opacity < 1 ancestor is a backdrop root and would make
+       every glass card flash unblurred during the route transition. */
+    from {
+        transform: translate3d(0, 4px, 0);
+    }
+    to {
+        transform: translate3d(0, 0, 0);
+    }
+}
+.animate-drawer-in {
+    animation: drawer-slide-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+}
+.animate-overlay-in {
+    animation: overlay-fade-in 0.2s ease-out;
+}
+@keyframes overlay-fade-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+.animate-overlay-out {
+    animation: overlay-fade-out 0.2s ease-in forwards;
+}
+@keyframes drawer-slide-out {
+    from { transform: translate3d(0, 0, 0); }
+    to   { transform: translate3d(-100%, 0, 0); }
+}
+.animate-drawer-out {
+    animation: drawer-slide-out 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.animate-page-in {
+    animation: page-fade-in 0.18s ease-out;
+}
+
+/*
+ * Honour the OS "reduce motion" setting: drop animations, transitions, and
+ * smooth scrolling to near-zero so motion-sensitive users get an instant,
+ * jank-free UI. Kept global so every component (incl. drawer + route fade) is
+ * covered without per-component checks.
+ */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .hover-lift:hover {
+        transform: none;
+    }
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: var(--scroll-track);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb);
+    border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scroll-thumb-hover);
+}
+
+/* Thin scrollbar variant for compact inline areas (descriptions, code blocks) */
+.scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--scroll-thumb);
+    border-radius: 2px;
+}
+.scrollbar-thin {
+    scrollbar-width: thin;
+}

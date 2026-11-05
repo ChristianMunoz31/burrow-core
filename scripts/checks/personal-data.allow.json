@@ -1,0 +1,236 @@
+{
+  "_comment": "Deliberate public values the personal-data check must not flag. A string exempts a finding only when it equals the WHOLE match (an email, phone, card, or home path such as Users/sam); a denylist term is exempt only inside an allowed string with non-word edges. So an allowed short address never excuses a longer one that ends with it, and Users/sam never excuses Users/samantha. `strings` apply to every file (the owner's public GitHub handle in CODEOWNERS and server/updateCheck.js). `perPath` entries apply only to files matching the glob: they hold synthetic fixtures in redaction, path and merchant-normalizer tests. `paths` are globs of whole files to skip; keep that list empty if possible.",
+  "paths": [],
+  "strings": [
+    "ChristianMunoz31"
+  ],
+  "perPath": [
+    {
+      "path": "server/__tests__/auditHardening.test.js",
+      "strings": [
+        "4111111111111111",
+        "4111 1111 1111 1111"
+      ]
+    },
+    {
+      "path": "server/__tests__/auditRedaction.test.js",
+      "strings": [
+        "a.b+tag@sub.example.co.uk",
+        "c@d.io"
+      ]
+    },
+    {
+      "path": "server/__tests__/exportCsvInjection.test.js",
+      "strings": [
+        "x@y.com"
+      ]
+    },
+    {
+      "path": "src/components/javi/__tests__/JaviAdvisor.test.jsx",
+      "strings": [
+        "x@y.io"
+      ]
+    },
+    {
+      "path": "src/utils/__tests__/javiRedact.test.js",
+      "strings": [
+        "pw@host.io"
+      ]
+    },
+    {
+      "path": "src/utils/**/__tests__/*.test.js",
+      "strings": [
+        "866-579-7172"
+      ]
+    },
+    {
+      "path": "server/__tests__/paths.test.js",
+      "strings": [
+        "Users\\sam",
+        "/home/sam",
+        "/Users/sam"
+      ]
+    },
+    {
+      "path": "pro/server/__tests__/jarvisToolErrors.test.js",
+      "strings": [
+        "/home/someone"
+      ]
+    },
+    {
+      "path": "server/__tests__/updateCheck.test.js",
+      "strings": [
+        "1.2.3.4"
+      ]
+    },
+    {
+      "path": "src-tauri/README.md",
+      "strings": [
+        "128x128@2x.png"
+      ]
+    },
+    {
+      "path": "src-tauri/tauri.conf.json",
+      "strings": [
+        "128x128@2x.png"
+      ]
+    },
+    {
+      "path": "server/__tests__/cloudBaseUrl.test.js",
+      "strings": [
+        "100.64.0.1",
+        "100.127.255.255",
+        "192.0.0.8",
+        "198.18.0.1",
+        "198.19.255.255",
+        "224.0.0.1",
+        "239.255.255.255",
+        "240.0.0.1",
+        "8.8.8.8",
+        "1.1.1.1",
+        "93.184.216.34",
+        "172.15.255.255",
+        "172.32.0.1",
+        "100.63.255.255",
+        "100.128.0.1",
+        "169.253.1.1",
+        "198.17.255.255",
+        "198.20.0.1",
+        "223.255.255.255"
+      ]
+    },
+    {
+      "path": "server/__tests__/cloudLeaks.test.js",
+      "strings": [
+        "192.88.99.1",
+        "8.8.8.8"
+      ]
+    },
+    {
+      "path": "server/ai/cloudGuard.js",
+      "strings": [
+        "100.64.0.0",
+        "192.0.0.0",
+        "192.88.99.0",
+        "198.18.0.0",
+        "224.0.0.0",
+        "240.0.0.0"
+      ]
+    },
+    {
+      "path": "scripts/desktop/icons.js",
+      "strings": [
+        "128x128@2x.png"
+      ]
+    },
+    {
+      "path": "server/__tests__/devChannelBuild.test.js",
+      "strings": [
+        "128x128@2x.png"
+      ]
+    },
+    {
+      "path": "src-tauri/tauri.dev.conf.json",
+      "strings": [
+        "128x128@2x.png"
+      ]
+    },
+    {
+      "path": "src/components/javi/reportContent.js",
+      "strings": [
+        "burrowsupport@gmail.com"
+      ]
+    },
+    {
+      "path": "src-tauri/src/menu.rs",
+      "strings": [
+        "burrowsupport@gmail.com"
+      ]
+    },
+    {
+      "path": "config/store.json",
+      "strings": [
+        "burrowsupport@gmail.com"
+      ]
+    },
+    {
+      "path": "pages/**",
+      "strings": [
+        "burrowsupport@gmail.com"
+      ]
+    },
+    {
+      "path": "server/__tests__/privacyPages.test.js",
+      "strings": [
+        "burrowsupport@gmail.com"
+      ]
+    },
+    {
+      "path": "src-tauri/src/updater.rs",
+      "strings": [
+        "1.2.3.4",
+        "pw@github.com",
+        "user@github.com"
+      ]
+    },
+    {
+      "path": "docs/RELEASING.md",
+      "strings": [
+        "1.0.0.0"
+      ]
+    },
+    {
+      "path": "docs/MICROSOFT_STORE.md",
+      "strings": [
+        "1.0.0.0",
+        "1.4.1.0",
+        "2.0.0.0",
+        "burrowsupport@gmail.com"
+      ]
+    },
+    {
+      "path": "server/__tests__/storeBuild.test.js",
+      "strings": [
+        "0.0.0.0",
+        "1.0.0.0",
+        "1.2.3.0",
+        "1.4.1.0",
+        "65535.65535.65535.0"
+      ]
+    },
+    {
+      "path": "docs/store/chrome-prompts.md",
+      "strings": [
+        "burrowsupport@gmail.com"
+      ]
+    },
+    {
+      "path": "server/__tests__/desktopDialogAuth.test.js",
+      "strings": [
+        "Users/Exämple"
+      ]
+    },
+    {
+      "path": "server/__tests__/dialogBroker.test.js",
+      "strings": [
+        "Users/Exämple",
+        "Users/Other"
+      ]
+    },
+    {
+      "path": "src-tauri/src/dialogs.rs",
+      "strings": [
+        "Users/Ex",
+        "home/x"
+      ]
+    },
+    {
+      "path": "server/__tests__/coreTreeGuard.test.js",
+      "strings": [
+        "git@github.com",
+        "tgit@github.com",
+        "token@github.com"
+      ]
+    }
+  ]
+}

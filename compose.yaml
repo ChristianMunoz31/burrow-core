@@ -1,0 +1,18 @@
+# Internal / self-host stack. Usage:
+#   $env:APP_PASSWORD = '...'; $env:AUTH_SECRET = '<32+ random chars>'; docker compose up --build
+# The UI is published on loopback only, on a port that never collides with the dev servers
+# (4321 API, 5174 Vite). Set BURROW_DOCKER_PORT to change it.
+services:
+  burrow:
+    build: .
+    ports:
+      - "127.0.0.1:${BURROW_DOCKER_PORT:-4390}:4321"
+    environment:
+      APP_PASSWORD: ${APP_PASSWORD:?set APP_PASSWORD}
+      AUTH_SECRET: ${AUTH_SECRET:?set AUTH_SECRET to at least 32 characters}
+    volumes:
+      - burrow-data:/data
+    restart: unless-stopped
+
+volumes:
+  burrow-data:

@@ -1,0 +1,12 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": { "createUpdaterArtifacts": true },
+  "plugins": {
+    "updater": {
+      "pubkey": "BURROW_UPDATER_PUBKEY_PLACEHOLDER",
+      "requireSignedVersion": true,
+      "endpoints": ["https://github.com/ChristianMunoz31/burrow-releases/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  }
+}

@@ -1,0 +1,165 @@
+{
+  "groupRules": {
+    "Savings": {
+      "categoryAliases": [
+        "investments",
+        "savings",
+        "credit card payment"
+      ],
+      "defaultSubcategory": "Savings",
+      "transferDefaultSubcategory": "Savings"
+    },
+    "Fixed Bills": {
+      "categoryAliases": [
+        "mortgage & rent",
+        "rent",
+        "bills & utilities",
+        "utilities",
+        "insurance",
+        "television",
+        "music",
+        "financial"
+      ],
+      "defaultSubcategory": "Utilities"
+    },
+    "Essentials": {
+      "categoryAliases": [
+        "groceries",
+        "gas",
+        "pharmacy",
+        "parking",
+        "auto & transport",
+        "doctor"
+      ],
+      "defaultSubcategory": "Groceries"
+    },
+    "Wants": {
+      "categoryAliases": [
+        "shopping",
+        "clothing",
+        "food & dining",
+        "fast food",
+        "restaurants",
+        "coffee shops",
+        "entertainment",
+        "hobbies",
+        "personal care",
+        "electronics & software"
+      ],
+      "defaultSubcategory": "Shopping"
+    },
+    "Buffer": {
+      "categoryAliases": [
+        "category pending",
+        "uncategorized",
+        "fees & charges",
+        "service fee"
+      ],
+      "defaultSubcategory": "Buffer"
+    }
+  },
+  "categoryRules": {
+    "Fixed Bills / Housing": {
+      "fallbackBudget": 0,
+      "categoryAliases": [
+        "rent",
+        "mortgage",
+        "home",
+        "hoa",
+        "property tax"
+      ]
+    },
+    "Fixed Bills / Utilities": {
+      "fallbackBudget": 0,
+      "categoryAliases": [
+        "electric",
+        "electricity",
+        "water",
+        "internet",
+        "phone",
+        "gas bill",
+        "sewer",
+        "trash"
+      ]
+    },
+    "Fixed Bills / Subscriptions": {
+      "fallbackBudget": 0,
+      "categoryAliases": [
+        "streaming",
+        "software",
+        "memberships",
+        "membership",
+        "subscription"
+      ]
+    },
+    "Essentials / Groceries": {
+      "fallbackBudget": 0,
+      "categoryAliases": [
+        "grocery",
+        "supermarket",
+        "food market"
+      ]
+    },
+    "Essentials / Transport": {
+      "fallbackBudget": 0,
+      "categoryAliases": [
+        "gas",
+        "fuel",
+        "transit",
+        "parking",
+        "rideshare",
+        "auto",
+        "taxi",
+        "toll"
+      ]
+    },
+    "Essentials / Health": {
+      "fallbackBudget": 0,
+      "categoryAliases": [
+        "medical",
+        "pharmacy",
+        "fitness",
+        "health insurance",
+        "dental",
+        "doctor",
+        "gym"
+      ]
+    },
+    "Wants / Dining": {
+      "fallbackBudget": 0,
+      "categoryAliases": [
+        "restaurants",
+        "restaurant",
+        "coffee",
+        "fast food",
+        "bars",
+        "bar",
+        "takeout"
+      ]
+    },
+    "Wants / Shopping": {
+      "fallbackBudget": 0,
+      "categoryAliases": [
+        "retail",
+        "clothing",
+        "electronics",
+        "apparel"
+      ]
+    },
+    "Savings / Savings": {
+      "fallbackBudget": 0,
+      "categoryAliases": [
+        "transfer to savings",
+        "savings transfer",
+        "investment",
+        "investments"
+      ]
+    },
+    "Buffer / Buffer": {
+      "fallbackBudget": 0
+    },
+    "Income / Income": {
+      "fallbackBudget": 0
+    }
+  }
+}

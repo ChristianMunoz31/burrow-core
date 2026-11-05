@@ -1,0 +1,22 @@
+# Optional overlay that adds a local Ollama container next to Burrow:
+#   docker compose -f compose.yaml -f compose.ollama.yaml up --build
+# Ollama publishes no host ports; only Burrow can reach it. Pull a model with:
+#   docker compose -f compose.yaml -f compose.ollama.yaml exec ollama ollama pull qwen2.5:3b
+# A non-loopback Ollama host needs the aiLan opt-in, which is pre-enabled here.
+services:
+  ollama:
+    # ollama/ollama:0.35.1, pinned by multi-arch index digest
+    image: ollama/ollama@sha256:292ee7945dfc3d5840a181f3ab86fedb1e66703e02c8af98b50f4da56b7e278c
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+  burrow:
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      BURROW_NETWORK_OPTIN: aiLan
+
+volumes:
+  ollama-models:

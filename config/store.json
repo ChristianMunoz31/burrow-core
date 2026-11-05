@@ -1,0 +1,14 @@
+{
+  "_help": "OWNER CONFIG for Burrow licensing. Paste the values from your Gumroad and Lemon Squeezy dashboards between the quotes, save, then run: npm run check:store-config. Leave a value empty (or [] / {}) to turn that store off. Product IDs are not secret. Keep the version names EXACTLY as typed in the store (capital letters matter) and never rename a version. gumroad.proProductId is the product_id of the Burrow Pro product. gumroad.freeLicenseProductId is the separate hidden product you give to students and nonprofits; leave it empty if you have none. gumroad.freeLicenseDefaultEdition (student or nonprofit) is the edition given when that product answers with no version, which is the case while it has no versions. The free Burrow download has no license key and is not listed here. lemonSqueezy.storeId and productIds are numbers from your Lemon Squeezy dashboard written as text, and variantEditions maps each variant id to one of: standard, founding, family, student, nonprofit. gumroad.proPurchaseUrl is the public Burrow Pro product page that the Buy Burrow Pro button opens in the browser; it must be an https gumroad.com address with no query string, and empty hides the button. supportContact is shown to buyers when something goes wrong, for example an email address. Keep this file valid JSON (double quotes, commas between items). A value that cannot be read turns only that store off.",
+  "supportContact": "burrowsupport@gmail.com",
+  "gumroad": {
+    "proPurchaseUrl": "https://cdmunoz98.gumroad.com/l/burrow",
+    "proProductId": "00SAHmplkC29OhrGdw3jcw==",
+    "proVersions": { "Standard": "standard", "Founding": "founding", "Family": "family" },
+    "freeLicenseProductId": "Jk2_BESpm1imDp_OPLJ9PA==",
+    "freeLicenseVersions": { "Student": "student", "Nonprofit": "nonprofit" },
+    "freeLicenseDefaultEdition": "student",
+    "maxUses": { "standard": 3, "founding": 3, "family": 10, "student": 3, "nonprofit": 3 }
+  },
+  "lemonSqueezy": { "storeId": "", "productIds": [], "variantEditions": {} }
+}

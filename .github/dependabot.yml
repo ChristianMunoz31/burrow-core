@@ -1,0 +1,62 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      # Monthly keeps the CI minutes down. Patch and minor PRs auto-merge when green; major PRs come
+      # singly and are never auto-merged (pr-bot.yml labels them hold; prBot.js holds them regardless).
+      interval: monthly
+    # Wait before proposing a fresh release, so a compromised or yanked version is usually caught
+    # first. Security updates ignore the cooldown.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+      prod-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+    ignore:
+      # Playwright upgrades are deliberate: bump @playwright/test, the container image in
+      # scripts/lib/playwrightImage.js (and ci.yml, flaky.yml) and the visual baselines together.
+      - dependency-name: "@playwright/test"
+      # Tailwind 4 moves the PostCSS plugin to @tailwindcss/postcss and needs a config and CSS
+      # migration plus a visual pass; do it as its own task, not a weekly bump.
+      - dependency-name: tailwindcss
+        update-types: ["version-update:semver-major"]
+      # 0.5.3+ flags the non-component exports in src/components/home/WidgetTile.jsx under
+      # react-refresh/only-export-components; lift this once those constants move out.
+      - dependency-name: eslint-plugin-react-refresh
+        versions: [">0.5.2"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      docker-images:
+        patterns: ["*"]
+    ignore:
+      # Stay on the Node 24 LTS line that Burrow targets; a Node major move is a deliberate
+      # change (engines, node:sqlite, desktop sidecar), not a weekly bump.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]

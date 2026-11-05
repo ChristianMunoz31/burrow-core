@@ -1,0 +1,25 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Burrow Dev",
+  "mainBinaryName": "BurrowDev",
+  "identifier": "com.burrow.desktop.dev",
+  "bundle": {
+    "shortDescription": "Burrow Dev: a test build of Burrow that installs next to it",
+    "externalBin": ["binaries/burrow-dev-server"],
+    "icon": [
+      "icons/dev/32x32.png",
+      "icons/dev/128x128.png",
+      "icons/dev/128x128@2x.png",
+      "icons/dev/icon.icns",
+      "icons/dev/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installerHooks": "installer/hooks.dev.nsh",
+        "installerIcon": "icons/dev/icon.ico",
+        "headerImage": "installer/dev/header.bmp",
+        "sidebarImage": "installer/dev/sidebar.bmp"
+      }
+    }
+  }
+}

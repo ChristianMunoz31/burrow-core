@@ -1,0 +1,175 @@
+{
+  "description": "Marker texts and whether the marker is valid. Shared by server/__tests__/dataFolderOwnership.test.js, src-tauri/src/data_guard.rs and server/__tests__/sideloadScript.test.js: the JS guard, the Rust guard and the sideload script must agree on every case. A case has \"text\" (UTF-8) or \"base64\" (raw bytes).",
+  "cases": [
+    {
+      "name": "canonical, pretty printed",
+      "valid": true,
+      "text": "{\n  \"app\": \"Burrow\",\n  \"edition\": \"store\",\n  \"dataLocation\": \"userprofile\",\n  \"createdAt\": \"2026-10-08T00:00:00.000Z\",\n  \"formatVersion\": 1\n}\n"
+    },
+    {
+      "name": "minified",
+      "valid": true,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1}"
+    },
+    {
+      "name": "extra fields are ignored",
+      "valid": true,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1,\"extra\":1,\"nested\":{\"formatVersion\":7},\"list\":[1,2]}"
+    },
+    {
+      "name": "createdAt is any string",
+      "valid": true,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"yesterday\",\"formatVersion\":1}"
+    },
+    {
+      "name": "non-ASCII text in an extra field",
+      "valid": true,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1,\"note\":\"caf\u00e9\"}"
+    },
+    {
+      "name": "duplicate key, the last one wins (valid last)",
+      "valid": true,
+      "text": "{\"app\":\"Other\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"x\",\"formatVersion\":1,\"app\":\"Burrow\"}"
+    },
+    {
+      "name": "duplicate key, the last one wins (invalid last)",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"x\",\"formatVersion\":1,\"app\":\"Other\"}"
+    },
+    {
+      "name": "formatVersion 1.0",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1.0}"
+    },
+    {
+      "name": "formatVersion 1e0",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1e0}"
+    },
+    {
+      "name": "formatVersion as a string",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":\"1\"}"
+    },
+    {
+      "name": "formatVersion 2",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":2}"
+    },
+    {
+      "name": "formatVersion 0",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":0}"
+    },
+    {
+      "name": "formatVersion true",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":true}"
+    },
+    {
+      "name": "formatVersion missing",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\"}"
+    },
+    {
+      "name": "app in another case",
+      "valid": false,
+      "text": "{\"app\":\"burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1}"
+    },
+    {
+      "name": "edition in another case",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"Store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1}"
+    },
+    {
+      "name": "dataLocation in another case",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"UserProfile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1}"
+    },
+    {
+      "name": "direct edition",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"direct\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1}"
+    },
+    {
+      "name": "appdata location",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"appdata\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1}"
+    },
+    {
+      "name": "key in another case instead of the real key",
+      "valid": false,
+      "text": "{\"App\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1}"
+    },
+    {
+      "name": "createdAt missing",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"formatVersion\":1}"
+    },
+    {
+      "name": "createdAt is a number",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":20261008,\"formatVersion\":1}"
+    },
+    {
+      "name": "createdAt is null",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":null,\"formatVersion\":1}"
+    },
+    {
+      "name": "leading byte order mark",
+      "valid": false,
+      "text": "\ufeff{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1}"
+    },
+    {
+      "name": "trailing garbage",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1} x"
+    },
+    {
+      "name": "truncated",
+      "valid": false,
+      "text": "{\"app\":\"Burrow\",\"edition\":\"store\",\"dataL"
+    },
+    {
+      "name": "an array holding a valid marker",
+      "valid": false,
+      "text": "[{\"app\":\"Burrow\",\"edition\":\"store\",\"dataLocation\":\"userprofile\",\"createdAt\":\"2026-10-08T00:00:00.000Z\",\"formatVersion\":1}]"
+    },
+    {
+      "name": "an empty array",
+      "valid": false,
+      "text": "[]"
+    },
+    {
+      "name": "null",
+      "valid": false,
+      "text": "null"
+    },
+    {
+      "name": "a string",
+      "valid": false,
+      "text": "\"Burrow\""
+    },
+    {
+      "name": "an empty file",
+      "valid": false,
+      "text": ""
+    },
+    {
+      "name": "only whitespace",
+      "valid": false,
+      "text": " \n"
+    },
+    {
+      "name": "invalid UTF-8 inside an extra field",
+      "valid": false,
+      "base64": "eyJhcHAiOiJCdXJyb3ciLCJlZGl0aW9uIjoic3RvcmUiLCJkYXRhTG9jYXRpb24iOiJ1c2VycHJvZmlsZSIsImNyZWF0ZWRBdCI6IjIwMjYtMTAtMDhUMDA6MDA6MDAuMDAwWiIsImZvcm1hdFZlcnNpb24iOjEsIm5vdGUiOiL//iJ9"
+    },
+    {
+      "name": "truncated UTF-8 sequence inside an extra field",
+      "valid": false,
+      "base64": "eyJhcHAiOiJCdXJyb3ciLCJlZGl0aW9uIjoic3RvcmUiLCJkYXRhTG9jYXRpb24iOiJ1c2VycHJvZmlsZSIsImNyZWF0ZWRBdCI6IjIwMjYtMTAtMDhUMDA6MDA6MDAuMDAwWiIsImZvcm1hdFZlcnNpb24iOjEsIm5vdGUiOiLDKCJ9"
+    }
+  ]
+}

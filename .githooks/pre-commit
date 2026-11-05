@@ -1,0 +1,4 @@
+#!/bin/sh
+# Burrow pre-commit: lint staged files, then em dash and personal-data checks.
+# Skip once with `git commit --no-verify`; CI runs the same checks.
+exec node scripts/checks/precommit.js

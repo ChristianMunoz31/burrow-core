@@ -1,0 +1,237 @@
+name: Flaky test hunt
+
+# Repeats the Vitest suite N times and tallies which tests fail, to find flakes.
+#  - Manual (workflow_dispatch): as before, pick runs, project and runner.
+#  - Weekly (Sundays 06:17 UTC; it was nightly, which cost about 150 more billed minutes a month): 3 runs
+#    of the whole suite on main. It skips (about 1 billed minute) when main has not changed since the last
+#    successful scheduled run. Failures open or update ONE issue "Flaky tests on main" (label flaky); 3 of 3
+#    failures is reported as "failing on main, not flaky".
+#  - The same scheduled run also executes the full Playwright suite (all four projects) in the
+#    pinned Playwright container, which the PR runs only partly (visual and a11y run on UI changes).
+# Private-repo minutes: ubuntu 1x, windows 2x. Pick windows-latest only when chasing a Windows-only flake.
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Number of repetitions (1 to 20)
+        required: true
+        default: '5'
+        type: string
+      project:
+        description: Vitest project
+        required: true
+        default: all
+        type: choice
+        options: [all, frontend, backend]
+      os:
+        description: Runner (windows-latest costs 2x minutes)
+        required: true
+        default: ubuntu-latest
+        type: choice
+        options: [ubuntu-latest, windows-latest]
+  schedule:
+    - cron: '17 6 * * 0'
+
+permissions: {}
+
+concurrency:
+  group: flaky-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  flaky:
+    name: flaky
+    runs-on: ${{ inputs.os || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      ran: ${{ steps.gate.outputs.ran }}
+      weekly: ${{ steps.gate.outputs.weekly }}
+    env:
+      RUNS: ${{ inputs.runs || '3' }}
+      PROJECT: ${{ inputs.project || 'all' }}
+      RUNNER_OS_INPUT: ${{ inputs.os || 'ubuntu-latest' }}
+    steps:
+      # Scheduled runs skip when main is unchanged since the last successful scheduled run.
+      # weekly=true on every scheduled run (the schedule is weekly): the e2e-weekly job below runs regardless.
+      - name: gate
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ran=true
+          weekly=false
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            weekly=true
+            last="$(gh api "repos/${GH_REPO}/actions/workflows/flaky.yml/runs?event=schedule&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // ""')"
+            if [ -n "$last" ] && [ "$last" = "$CURRENT_SHA" ]; then
+              ran=false
+              echo "main has not changed since the last successful scheduled run ($last); skipping."
+            fi
+          fi
+          echo "ran=$ran" >> "$GITHUB_OUTPUT"
+          echo "weekly=$weekly" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.gate.outputs.ran == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: steps.gate.outputs.ran == 'true'
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        if: steps.gate.outputs.ran == 'true'
+      - name: Repeat the suite
+        if: steps.gate.outputs.ran == 'true'
+        run: |
+          set -uo pipefail
+          if ! [[ "$RUNS" =~ ^[0-9]+$ ]] || [ "$RUNS" -lt 1 ] || [ "$RUNS" -gt 20 ]; then
+            echo "runs must be an integer from 1 to 20"; exit 1
+          fi
+          args=()
+          if [ "$PROJECT" != "all" ]; then args=(--project "$PROJECT"); fi
+          failed_runs=0
+          for i in $(seq 1 "$RUNS"); do
+            echo "::group::Run $i of $RUNS"
+            if npx vitest run "${args[@]}" --reporter=json --outputFile="$RUNNER_TEMP/run-$i.json"; then
+              echo "run $i passed"
+            else
+              failed_runs=$((failed_runs + 1))
+              echo "run $i FAILED"
+            fi
+            echo "::endgroup::"
+          done
+          RUN_DIR="$RUNNER_TEMP" OUT_DIR="$RUNNER_TEMP/flaky-report" FAILED_RUNS="$failed_runs" \
+            node scripts/ci/flakyReport.js tally
+          [ "$failed_runs" -eq 0 ]
+      - name: Upload flaky report
+        if: always() && steps.gate.outputs.ran == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flaky-report
+          path: ${{ runner.temp }}/flaky-report/
+          retention-days: 1
+          if-no-files-found: ignore
+
+  report:
+    name: report
+    needs: flaky
+    if: always() && github.event_name == 'schedule' && needs.flaky.outputs.ran == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Fetch the report artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: gh run download "$RUN_ID" --name flaky-report --dir "$RUNNER_TEMP/flaky-report" || echo "no report artifact"
+      - name: Create or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_FILE: ${{ runner.temp }}/flaky-report/report.json
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FLAKY_RESULT: ${{ needs.flaky.result }}
+        run: node scripts/ci/flakyReport.js report
+
+  # Every scheduled (weekly) run: every Playwright project (the PR run skips visual and a11y when the UI is untouched).
+  # Same pinned image as ci.yml, so screenshots match the committed baselines. Runs even when the
+  # vitest part was skipped: this one watches for environment drift, not for code changes.
+  e2e-weekly:
+    name: e2e-weekly
+    needs: flaky
+    if: always() && github.event_name == 'schedule' && needs.flaky.outputs.weekly == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --ipc=host --init
+    # Container jobs default to sh (dash), which has no `set -o pipefail`: the scripts below need bash.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: tools
+        run: |
+          set -euo pipefail
+          if ! command -v git >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y --no-install-recommends git ca-certificates
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The checkout is owned by another user than the container's, so git refuses it ("dubious ownership").
+      - name: git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: e2e (Playwright, all projects)
+        id: e2e
+        run: npx playwright test
+      - name: Upload Playwright report
+        if: always() && steps.e2e.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report-weekly
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 1
+          if-no-files-found: ignore
+
+  # A failed weekly e2e run opens (or updates) ONE issue "Weekly e2e failing on main" labelled flaky, like the
+  # unit report above. Separate from e2e-weekly because that job runs in the Playwright container (no gh)
+  # and keeps contents: read only; this is the only job here besides `report` with issues: write.
+  e2e-report:
+    name: e2e-report
+    needs: e2e-weekly
+    if: always() && github.event_name == 'schedule' && needs.e2e-weekly.result == 'failure'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          title="Weekly e2e failing on main"
+          body="$(printf 'Last updated: %s\nRun: %s\n\nThe weekly full Playwright run (flows, first-run, visual, a11y) failed. Open the run for the report artifact (kept 1 day).' "$(date -u +%F)" "$RUN_URL")"
+          number="$(gh api "repos/${GH_REPO}/issues?state=open&labels=flaky&per_page=100" \
+            --jq '[.[] | select(.title == "Weekly e2e failing on main" and .user.login == "github-actions[bot]" and (has("pull_request") | not))][0].number // empty')"
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body "$body"
+            gh issue comment "$number" --body "Still failing. Run: ${RUN_URL}"
+          else
+            gh issue create --title "$title" --label flaky --body "$body"
+          fi

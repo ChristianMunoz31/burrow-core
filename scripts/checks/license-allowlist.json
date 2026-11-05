@@ -1,0 +1,4 @@
+{
+  "_comment": "Documented exceptions to npm run check:licenses (scripts/checks/licenseAudit.js). Key: package name or name@version; value: why the license is acceptable in official (AGPL core plus proprietary Pro) builds. Owner review required for every entry.",
+  "packages": {}
+}

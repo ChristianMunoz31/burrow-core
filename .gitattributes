@@ -1,0 +1,16 @@
+devtools export-ignore
+* text=auto eol=lf
+*.ps1 text eol=crlf
+.githooks/* text eol=lf
+*.sh text eol=lf
+pro export-ignore
+# Private-only paths that never enter the public core export (docs/adr/0001-open-core-split.md O3; scripts/checks/coreTreeGuard.js)
+.claude export-ignore
+.github/workflows/release.yml export-ignore
+.github/workflows/desktop-windows.yml export-ignore
+.github/workflows/dev-build.yml export-ignore
+.github/workflows/release-please.yml export-ignore
+scripts/runner export-ignore
+docs/release-runbook-*.md export-ignore
+docs/SELF_HOSTED_RUNNER.md export-ignore
+config/msstore.json export-ignore

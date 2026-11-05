@@ -1,0 +1,4 @@
+{
+  "_help": "Used only by scripts/release/syncGumroad.mjs (npm run release:gumroad), which the owner runs on their own computer after a release. It is NOT read by the app and is not baked into any build; the licensing ids the app needs stay in config/store.json. downloadProductId is the product_id of the free Burrow download page on Gumroad (it has no license key, so it is not listed in store.json). Product ids are not secret. Keep this file valid JSON.",
+  "downloadProductId": "cPgrMauJJZfyTfGRMgRdcQ=="
+}

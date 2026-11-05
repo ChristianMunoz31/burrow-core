@@ -1,0 +1,5 @@
+{
+  "_help": "Version and effective date printed on the published privacy policy (pages/privacy/index.html). Edit these by hand when the policy changes, then run: npm run privacy:render. The date is data, not the clock, so the generated page is deterministic.",
+  "policyVersion": "1.2",
+  "effectiveDate": "2026-10-11"
+}

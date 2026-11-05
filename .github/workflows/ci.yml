@@ -1,0 +1,423 @@
+name: CI
+
+# The one workflow for pull requests, main and release PRs. hygiene.yml merged into ci.yml, not removed:
+# its secret scan and repo checks are the `hygiene:` steps below.
+#
+# Pull request (job `verify`, the one required check): one npm ci and one build.
+#   hygiene (gitleaks, em dash, keys, personal data), tests-required, lint, affected unit tests
+#   (`vitest --changed <base sha>`, whole suite when config or shared files change), coverage of changed
+#   files, build, bundle budget, Playwright (flows, first-run, visual, a11y).
+#   There is no workflow-level path filter on pull requests: docs-only PRs still run it and the heavy steps
+#   skip inside the job, so the check always completes for the PR bot (pr-bot.yml).
+#   PR bot reads the step names below: keep `tests-required`, `coverage (changed files)` and
+#   `e2e (Playwright)` exact.
+# Push to main (jobs `main-unit` x3 shards and `main-build`): the whole suite sharded three ways, lint and
+#   build once. No Playwright and none of the PR-only steps. Docs-only pushes are skipped (paths-ignore).
+#   A merge made by the PR bot uses GITHUB_TOKEN and fires no push, so the pr-bot merge job dispatches this
+#   workflow on main with mode full: on main that runs the same sharded jobs (cheaper than the full
+#   verify job, which is for other refs).
+#   pr-bot.yml only reacts to workflow runs whose event is pull_request, so a main run never merges anything.
+# Manual run (workflow_dispatch; release-please.yml starts it on the release PR branch):
+#   mode full (default: hygiene, lint, the full unit suite, build, bundle budget, all Playwright projects;
+#   there is no PR base, so the classify step defaults to the full suite),
+#   hygiene (secret scan and checks only), visual-update (job `visual-baselines`: regenerates the Linux
+#   screenshot baselines and pushes them to a NEW side branch ci/visual-baselines-<run id>; no artifact,
+#   never touches the dispatched branch, refuses main and release-please branches).
+# Private-repo minutes: Linux 1x. See docs/PIPELINE.md for the monthly estimate.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**', 'LICENSE']
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: full, hygiene (checks only) or visual-update (new visual baselines pushed to a side branch)
+        required: false
+        default: full
+        type: choice
+        options: [full, hygiene, visual-update]
+
+permissions: {}
+
+# A newer push to the same PR cancels the older run. Pushes to main get a group per commit and are never
+# cancelled, so every non-docs main commit is tested (bot merges start a dispatched full run, see above).
+concurrency:
+  group: ci-${{ github.ref }}-${{ inputs.mode || (github.event_name == 'push' && github.sha) || 'pr' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Pinned release plus its published sha256. Bump both together. Verified in the gitleaks step.
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+jobs:
+  verify:
+    name: verify
+    if: github.event_name != 'push' && inputs.mode != 'visual-update' && !(github.event_name == 'workflow_dispatch' && inputs.mode == 'full' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      pull-requests: read
+    # The same image scripts/visualUpdate.js uses, so Linux screenshot baselines match CI exactly.
+    # Its tag equals the @playwright/test version in package-lock.json (a unit test checks this and
+    # that this string equals PLAYWRIGHT_IMAGE in scripts/lib/playwrightImage.js).
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --ipc=host --init
+    # Container jobs default to sh (dash), which has no `set -o pipefail`: the scripts below need bash.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: tools
+        run: |
+          set -euo pipefail
+          if ! command -v git >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y --no-install-recommends git curl ca-certificates
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # The checkout is owned by another user than the container's, so git refuses it ("dubious ownership").
+      - name: git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      # A manual run has no pull request, so BASE_SHA is empty there: changeKinds then reports the full
+      # suite and every Playwright project instead of reading a diff.
+      - name: classify
+        id: kinds
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: node scripts/ci/changeKinds.js
+
+      # On a pull request the scan policy comes from the BASE branch, so a PR cannot weaken
+      # .gitleaks.toml, .gitleaksignore or the personal-data allowlist and then pass its own checks.
+      # If the base lacks .gitleaks.toml or the allowlist (first introduction), the head copy is used;
+      # a missing base .gitleaksignore means an empty one. gitleaks also reads <source>/.gitleaksignore
+      # on top of --gitleaks-ignore-path, so the workspace copy is replaced by the base copy too.
+      # A PR that adds an inline allow comment (see the marker below) fails: inline allows are an
+      # unreviewed way to silence the scan. Manual runs use their own copies.
+      - name: "hygiene: trusted config"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          GITLEAKS_CONFIG=".gitleaks.toml"
+          ALLOW_FILE="scripts/checks/personal-data.allow.json"
+          GITLEAKS_IGNORE=".gitleaksignore"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            # Fail closed: without a base commit nothing below can be trusted.
+            if ! git rev-parse --verify "origin/${BASE_REF}^{commit}" >/dev/null 2>&1; then
+              echo "::error title=Base ref missing::origin/${BASE_REF} is not a commit in this checkout, so the scan policy cannot be read from the base branch."
+              exit 1
+            fi
+            if ! changed="$(git diff --name-only "origin/${BASE_REF}...HEAD" -- "$GITLEAKS_CONFIG" "$ALLOW_FILE")"; then
+              echo "::error title=Diff failed::git diff against origin/${BASE_REF} failed."
+              exit 1
+            fi
+            changed="$(printf '%s' "$changed" | tr '\n' ' ')"
+            if [ -n "$changed" ]; then
+              echo "::warning title=Scan policy changed::This PR changes ${changed}. Checks run with the base branch copy; review the change by hand."
+            fi
+            # `git cat-file -e` separates a file that does not exist on the base (first introduction) from
+            # a real failure: the ref is verified above, so a failing `git show` aborts the job.
+            if git cat-file -e "origin/${BASE_REF}:${GITLEAKS_CONFIG}" 2>/dev/null; then
+              git show "origin/${BASE_REF}:${GITLEAKS_CONFIG}" > "$RUNNER_TEMP/gitleaks.base.toml"
+              GITLEAKS_CONFIG="$RUNNER_TEMP/gitleaks.base.toml"
+            fi
+            if git cat-file -e "origin/${BASE_REF}:${ALLOW_FILE}" 2>/dev/null; then
+              git show "origin/${BASE_REF}:${ALLOW_FILE}" > "$RUNNER_TEMP/personal-data.allow.base.json"
+              cp "$RUNNER_TEMP/personal-data.allow.base.json" "$ALLOW_FILE"
+            fi
+            GITLEAKS_IGNORE="$RUNNER_TEMP/gitleaksignore.base"
+            if git cat-file -e "origin/${BASE_REF}:.gitleaksignore" 2>/dev/null; then
+              git show "origin/${BASE_REF}:.gitleaksignore" > "$GITLEAKS_IGNORE"
+              cp "$GITLEAKS_IGNORE" .gitleaksignore
+            else
+              : > "$GITLEAKS_IGNORE"
+              rm -f .gitleaksignore
+            fi
+            marker="gitleaks:""allow"
+            if ! git diff --no-color --text -U0 "origin/${BASE_REF}...HEAD" > "$RUNNER_TEMP/pr.diff"; then
+              echo "::error title=Diff failed::git diff against origin/${BASE_REF} failed."
+              exit 1
+            fi
+            added="$(grep -E '^\+' "$RUNNER_TEMP/pr.diff" | grep -vE '^\+\+\+ ' | grep -cF -e "$marker" || true)"
+            if [ "$added" != "0" ]; then
+              echo "::error title=Inline gitleaks allow::This PR adds $added line(s) with an inline gitleaks allow comment. Remove them; a human must review any scan exception."
+              exit 1
+            fi
+          fi
+          echo "GITLEAKS_CONFIG=$GITLEAKS_CONFIG" >> "$GITHUB_ENV"
+          echo "GITLEAKS_IGNORE=$GITLEAKS_IGNORE" >> "$GITHUB_ENV"
+
+      # The binary is used instead of gitleaks-action, which needs a licence for organisation accounts.
+      - name: "hygiene: gitleaks"
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git --redact --no-banner --exit-code 1 --config "$GITLEAKS_CONFIG" --gitleaks-ignore-path "$GITLEAKS_IGNORE"
+
+      - name: "hygiene: em dash"
+        run: npm run check:em-dash
+
+      - name: "hygiene: keys"
+        run: npm run check:keys
+
+      - name: "hygiene: personal data"
+        run: npm run check:personal
+        env:
+          # Optional private terms (names, addresses). Empty on forks and Dependabot. Never printed by the check.
+          PERSONAL_DENYLIST: ${{ secrets.PERSONAL_DENYLIST }}
+
+      # Non-fatal: the verdict goes to the step summary and the PR bot re-evaluates it live from the
+      # current labels and description (decide() in scripts/ci/prBot.js), so adding the waiver needs
+      # no CI re-run. continue-on-error also keeps the later steps running.
+      - name: tests-required
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: CHANGED_JSON="$RUNNER_TEMP/changed.json" node scripts/checks/testsRequired.js
+
+      - name: npm ci
+        if: steps.kinds.outputs.docs_only != 'true' && inputs.mode != 'hygiene'
+        run: npm ci
+
+      - name: lint
+        if: steps.kinds.outputs.docs_only != 'true' && inputs.mode != 'hygiene'
+        run: npm run lint
+
+      - name: unit tests
+        if: steps.kinds.outputs.docs_only != 'true' && inputs.mode != 'hygiene'
+        env:
+          FULL_SUITE: ${{ steps.kinds.outputs.full_suite }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: CHANGED_JSON="$RUNNER_TEMP/changed.json" node scripts/ci/runUnitTests.js
+
+      - name: coverage (changed files)
+        id: coverage
+        if: github.event_name == 'pull_request' && steps.kinds.outputs.docs_only != 'true'
+        run: CHANGED_JSON="$RUNNER_TEMP/changed.json" node scripts/checks/changedCoverage.js
+
+      # build, bundle budget, the web upload and e2e also run when only the coverage floor failed, so a
+      # waived coverage failure still proves them (the PR bot accepts that one failure only with the
+      # live owner waiver, and then a human merges). Any earlier failure still stops the job: coverage is
+      # skipped then. Everything after build also needs build itself to have succeeded.
+      - name: build
+        id: build
+        if: (success() || steps.coverage.outcome == 'failure') && steps.kinds.outputs.docs_only != 'true' && inputs.mode != 'hygiene'
+        run: npm run build
+
+      - name: bundle budget
+        if: (success() || steps.coverage.outcome == 'failure') && steps.build.outcome == 'success' && steps.kinds.outputs.docs_only != 'true' && inputs.mode != 'hygiene'
+        run: npm run check:bundle
+
+      # A stable dist must carry no developer tools UI (they live in devtools/ and only build:devtools or the dev channel add them).
+      # CI runs Free mode only (docs/adr/0001-open-core-split.md 3.15): pro/ is never checked out, and the dist must have no Pro chunks.
+      - name: stable dist has no developer tools
+        if: (success() || steps.coverage.outcome == 'failure') && steps.build.outcome == 'success' && steps.kinds.outputs.docs_only != 'true' && inputs.mode != 'hygiene'
+        run: node scripts/checks/channelMarker.js --expect stable --dist-dir dist --expect-pro absent
+
+      # The two uploads below are conveniences (preview, failure report): when artifact storage is full
+      # they must not fail the required check or hide a real test failure, so they are non-fatal.
+      - name: Upload web build
+        if: (success() || steps.coverage.outcome == 'failure') && steps.build.outcome == 'success' && github.event_name == 'pull_request' && steps.kinds.outputs.app_changed == 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web-dist
+          path: dist/
+          retention-days: 3
+          if-no-files-found: error
+
+      # flows and first-run always run when the app changed. visual and a11y only when something
+      # that can change the UI changed (src, public, index.html, Tailwind/PostCSS/Vite config, lockfile, e2e).
+      # Draft PRs skip Playwright; marking ready runs CI again.
+      - name: e2e (Playwright)
+        id: e2e
+        if: (success() || steps.coverage.outcome == 'failure') && steps.build.outcome == 'success' && steps.kinds.outputs.app_changed == 'true' && inputs.mode != 'hygiene' && github.event.pull_request.draft != true
+        env:
+          FRONTEND_CHANGED: ${{ steps.kinds.outputs.frontend_changed }}
+        run: |
+          set -euo pipefail
+          projects=(--project=flows --project=first-run)
+          if [ "$FRONTEND_CHANGED" = "true" ]; then
+            projects+=(--project=visual --project=a11y)
+          fi
+          npx playwright test "${projects[@]}"
+
+      - name: Upload Playwright report
+        if: always() && steps.e2e.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 1
+          if-no-files-found: ignore
+
+  # Manual run, mode visual-update only. A separate job so `verify` (the PR check) keeps contents: read:
+  # this is the only job in the workflow with contents: write. It renders the baselines in the same pinned
+  # image as verify, commits only e2e/__screenshots__ and pushes ONE new branch ci/visual-baselines-<run id>
+  # from the dispatched ref's HEAD. It never writes to the dispatched branch and no artifact is uploaded
+  # (account-wide artifact storage is full). The checkout keeps no credentials: the token reaches only the
+  # final push step, through its env, so branch code never finds it on disk. npm ci still runs with
+  # --ignore-scripts. A push made with GITHUB_TOKEN starts no workflow.
+  visual-baselines:
+    name: visual-baselines
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'visual-update'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --ipc=host --init
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: refuse main and release branches
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          case "$REF" in
+            refs/heads/main | refs/heads/release-please--* | refs/heads/dependabot/*)
+              echo "::error title=Refused::visual-update never runs on main, a release-please branch or a dependabot branch ($REF). Dispatch it on a feature branch."
+              exit 1
+              ;;
+            refs/heads/*) ;;
+            *)
+              echo "::error title=Refused::visual-update needs a branch ref, got $REF."
+              exit 1
+              ;;
+          esac
+
+      - name: tools
+        run: |
+          set -euo pipefail
+          if ! command -v git >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y --no-install-recommends git curl ca-certificates
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: npm ci
+        run: npm ci --ignore-scripts
+
+      - name: build
+        run: npm run build
+
+      - name: visual baselines (update)
+        run: npx playwright test --project=visual --update-snapshots
+
+      - name: push visual baselines to a side branch
+        env:
+          RUN_ID: ${{ github.run_id }}
+          SOURCE_REF: ${{ github.ref_name }}
+          SOURCE_SHA: ${{ github.sha }}
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="ci/visual-baselines-${RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -A -- e2e/__screenshots__
+          if git diff --cached --quiet; then
+            echo "No baseline changed on ${SOURCE_REF}; nothing pushed." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          other="$(git diff --cached --name-only | grep -Ev '^e2e/__screenshots__/.+\.png$' || true)"
+          if [ -n "$other" ]; then
+            echo "::error title=Unexpected files staged::$other"
+            exit 1
+          fi
+          git -c core.hooksPath=/dev/null commit -m "test(e2e): Linux visual baselines generated by CI" -m "Source: ${SOURCE_REF} at ${SOURCE_SHA}. Run ${RUN_ID}."
+          git -c core.hooksPath=/dev/null -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)" push origin "HEAD:refs/heads/${branch}"
+          count="$(git diff --name-only "${SOURCE_SHA}" HEAD | wc -l | tr -d ' ')"
+          {
+            echo "### Visual baselines"
+            echo ""
+            echo "Branch: \`${branch}\` (${count} files changed against \`${SOURCE_REF}\` at \`${SOURCE_SHA}\`)"
+            echo ""
+            echo "Copy the PNGs into your PR branch, commit and push, then delete the side branch. See docs/PIPELINE.md."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Push to main, or a manual full run on main: the whole suite split three ways (each shard is a separate Linux job with its own npm
+  # ci), plus lint and one build. Nothing here is a PR step, and pr-bot.yml ignores runs of this event.
+  main-unit:
+    name: main-unit (${{ matrix.shard }}/3)
+    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'full' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: unit tests (shard ${{ matrix.shard }}/3)
+        run: npx vitest run --shard=${{ matrix.shard }}/3
+
+  main-build:
+    name: main-build
+    if: (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'full' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: lint
+        run: npm run lint
+      - name: build
+        run: npm run build

@@ -1,0 +1,68 @@
+name: Desktop check
+
+# Rust checks for the Tauri shell in src-tauri: rustfmt, clippy (warnings are errors) and unit tests.
+# Linux only, and only when the shell or this file changes (the web app is covered by ci.yml).
+# Private-repo minutes (Linux 1x): about 12 to 15 min on a cold cache, about 3 to 5 min with a warm
+# Swatinem/rust-cache. Windows and macOS are not built here; installers are a manual release.yml run.
+# ubuntu-22.04 is what the Tauri v2 prerequisites page documents (webkit2gtk-4.1 is available there).
+on:
+  push:
+    branches: [main]
+    paths: ['src-tauri/**', '.github/workflows/desktop-check.yml']
+  pull_request:
+    paths: ['src-tauri/**', '.github/workflows/desktop-check.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-check-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  rust:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Tauri Linux dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential curl file patchelf libssl-dev libxdo-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Install Rust (stable)
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup default stable
+          rustc -vV
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+      # tauri-build checks that the sidecar and bundled resources exist, even for cargo check and test.
+      # Empty stand-ins are enough here; the real ones come from `npm run desktop:sidecar` in release.yml.
+      - name: Create placeholder sidecar and resources
+        run: |
+          set -euo pipefail
+          mkdir -p src-tauri/binaries src-tauri/resources/dist
+          printf '#!/bin/sh\nexit 0\n' > src-tauri/binaries/burrow-server-x86_64-unknown-linux-gnu
+          chmod +x src-tauri/binaries/burrow-server-x86_64-unknown-linux-gnu
+          echo '<!doctype html><title>placeholder</title>' > src-tauri/resources/dist/index.html
+          rm -rf src-tauri/resources/migrations
+          cp -r server/db/migrations src-tauri/resources/migrations
+      - name: rustfmt
+        working-directory: src-tauri
+        run: cargo fmt --check
+      - name: clippy
+        working-directory: src-tauri
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: test
+        working-directory: src-tauri
+        run: cargo test --locked

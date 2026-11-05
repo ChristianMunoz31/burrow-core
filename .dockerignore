@@ -1,0 +1,35 @@
+node_modules
+dist
+.git
+.github
+**/.env*
+*.db*
+*.bak
+coverage
+data
+.claude
+docs
+**/__tests__
+devtools
+# Burrow Pro: only pro/server and pro/ui enter the build (pro/LICENSE too); never its git data, e2e, evals or scripts.
+# pro/ itself must NOT be excluded here (docs/adr/0001-open-core-split.md R4; proBoundary.test.js checks it).
+pro/.git
+pro/e2e
+pro/evals
+pro/scripts
+pro/node_modules
+# Mirrors the sensitive entries of .gitignore. Globs use **/ because .dockerignore has no implicit recursion.
+**/.personal-denylist
+**/secrets.key
+**/*.csv
+**/*.tsv
+**/*.xlsx
+**/.npmrc
+**/*.local
+**/logs
+**/*.log
+**/*.private.pem
+**/*.burrowlicense
+**/license-clock.json
+**/license-trial.json
+**/license-activation.json

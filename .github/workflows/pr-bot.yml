@@ -1,0 +1,136 @@
+name: PR bot
+
+# Sticky status comment and guarded auto-merge (no branch protection on this plan, so the bot IS the
+# merge gate). Security rules for this file:
+#  - It never checks out or runs PR code: the checkout below is the default branch, and the scripts
+#    it runs are the trusted copies from main.
+#  - No untrusted ${{ }} (branch names, titles, bodies, labels) inside run: lines. Values reach the
+#    scripts through env: only, and the scripts validate them (digits, 40 hex).
+#  - pull_request_target actions that no job matches cost 0 billed minutes.
+# Bot merges made with GITHUB_TOKEN do not fire push on main, so the merge job dispatches ci.yml on main
+# with mode full after a successful merge (that runs the sharded main-unit and main-build jobs). That is
+# why the merge job alone has actions: write. release-please runs on a daily schedule (release-please.yml).
+on:
+  workflow_run:
+    workflows: [CI, Desktop check]
+    types: [completed]
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
+
+permissions: {}
+
+concurrency:
+  group: pr-bot-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pr-status:
+    name: pr-status
+    if: >-
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.event == 'pull_request'
+        && github.event.workflow_run.conclusion != 'cancelled'
+        && github.event.workflow_run.head_repository.full_name == github.repository)
+      || (github.event_name == 'pull_request_target'
+        && github.event.pull_request.head.repo.full_name == github.repository
+        && contains(fromJSON('["labeled","unlabeled","edited"]'), github.event.action))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # actions: read lists the CI run and its jobs. The bot never re-runs workflows: the waiver is
+    # evaluated live, so a label or description edit needs no CI re-run.
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: read
+      actions: read
+    outputs:
+      action: ${{ steps.status.outputs.action }}
+      pr: ${{ steps.status.outputs.pr }}
+      sha: ${{ steps.status.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: status
+        id: status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/ci/prBot.js status
+
+  merge:
+    name: merge
+    needs: pr-status
+    if: needs.pr-status.outputs.action == 'merge'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      # Re-runs every merge condition live, then squash-merges with the head sha as a guard
+      # (GitHub answers 409 if the head moved in between).
+      - name: merge
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ needs.pr-status.outputs.pr }}
+          PR_SHA: ${{ needs.pr-status.outputs.sha }}
+        run: node scripts/ci/prBot.js merge --pr "$PR_NUMBER" --sha "$PR_SHA"
+      # GITHUB_TOKEN merges fire no push event, so start the full main run by hand. workflow_dispatch is
+      # the one trigger a GITHUB_TOKEN may start. A failure here does not undo the merge.
+      - name: test main after the merge
+        if: steps.merge.outputs.merged == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run ci.yml --ref main -f mode=full
+
+  # Major version bumps are never merged unattended: they get the hold label. This job only labels,
+  # once, when the PR opens. The merge decision does not depend on it: decide() in prBot.js parses
+  # the version changes itself and holds every major (or unreadable) Dependabot update.
+  dependabot-hold:
+    name: dependabot-hold
+    if: >-
+      github.event_name == 'pull_request_target'
+      && github.event.pull_request.user.login == 'dependabot[bot]'
+      && contains(fromJSON('["opened","reopened"]'), github.event.action)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: ${{ github.token }}
+      - name: hold major updates
+        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          if gh pr view "$PR_URL" --json labels --jq '.labels[].name' | grep -qx hold; then
+            echo "hold label already present"
+            exit 0
+          fi
+          gh pr edit "$PR_URL" --add-label hold
+          gh pr comment "$PR_URL" --body "Major version update: labelled \`hold\`, so it is never auto-merged. Review the changelog and merge it by hand."

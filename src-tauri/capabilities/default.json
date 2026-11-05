@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Splash and error pages only. No permissions, and no remote entry, so the http://127.0.0.1 Burrow UI gets no IPC.",
+  "local": true,
+  "windows": ["main"],
+  "permissions": []
+}

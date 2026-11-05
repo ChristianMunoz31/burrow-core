@@ -1,0 +1,9 @@
+{
+  "001_init.sql": "9762851ce3b6fc22ffcc15525f5aa32f304bc1a8ffea947014481324711ec5df",
+  "002_ai_local.sql": "a94bfa021234c155519d1766c870dc598282279f8c0307c7de8ef24e468df3ef",
+  "003_remove_dev_features.sql": "8ebcedc52a91d2434b93ff4fe200b4f15627c50dec8d66f85ab31858ba59ee35",
+  "004_remove_chat_personas.sql": "91c2a0e269dedb01427a75d744c5f95af71e51a607243f2ef9cd88540da2b303",
+  "005_perf_indexes.sql": "948741cc50cf9a64a43978a478e2254ddf16aad19a964bc03a23e784fbfde1fd",
+  "006_folders.sql": "c7b9f65f8761d4e5b5fd7668b68716cf2ea9bf0cceae5260727c6de7e9441a6e",
+  "007_folder_confirm.sql": "d6485b5fcbba3fba83859cee5c054d56358205eec004af8baae8fcb5b44b8e28"
+}

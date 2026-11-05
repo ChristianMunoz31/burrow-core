@@ -1,0 +1,136 @@
+{
+  "groups": [
+    {
+      "id": "grp-savings",
+      "name": "Savings",
+      "displayName": "Savings",
+      "isIncome": false,
+      "sortOrder": 8192
+    },
+    {
+      "id": "grp-fixed",
+      "name": "Fixed Bills",
+      "displayName": "Fixed Bills",
+      "isIncome": false,
+      "sortOrder": 16384
+    },
+    {
+      "id": "grp-income",
+      "name": "Income",
+      "displayName": "Income",
+      "isIncome": true,
+      "sortOrder": 32768
+    },
+    {
+      "id": "grp-essentials",
+      "name": "Essentials",
+      "displayName": "Essentials",
+      "isIncome": false,
+      "sortOrder": 49152
+    },
+    {
+      "id": "grp-wants",
+      "name": "Wants",
+      "displayName": "Wants",
+      "isIncome": false,
+      "sortOrder": 65536
+    },
+    {
+      "id": "grp-buffer",
+      "name": "Buffer",
+      "displayName": "Buffer",
+      "isIncome": false,
+      "sortOrder": 81920
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat-housing",
+      "name": "Housing",
+      "groupId": "grp-fixed",
+      "groupName": "Fixed Bills",
+      "sortOrder": 1024,
+      "key": "Fixed Bills / Housing"
+    },
+    {
+      "id": "cat-utilities",
+      "name": "Utilities",
+      "groupId": "grp-fixed",
+      "groupName": "Fixed Bills",
+      "sortOrder": 2048,
+      "key": "Fixed Bills / Utilities"
+    },
+    {
+      "id": "cat-subscriptions",
+      "name": "Subscriptions",
+      "groupId": "grp-fixed",
+      "groupName": "Fixed Bills",
+      "sortOrder": 3072,
+      "key": "Fixed Bills / Subscriptions"
+    },
+    {
+      "id": "cat-groceries",
+      "name": "Groceries",
+      "groupId": "grp-essentials",
+      "groupName": "Essentials",
+      "sortOrder": 1024,
+      "key": "Essentials / Groceries"
+    },
+    {
+      "id": "cat-transport",
+      "name": "Transport",
+      "groupId": "grp-essentials",
+      "groupName": "Essentials",
+      "sortOrder": 2048,
+      "key": "Essentials / Transport"
+    },
+    {
+      "id": "cat-health",
+      "name": "Health",
+      "groupId": "grp-essentials",
+      "groupName": "Essentials",
+      "sortOrder": 3072,
+      "key": "Essentials / Health"
+    },
+    {
+      "id": "cat-dining",
+      "name": "Dining",
+      "groupId": "grp-wants",
+      "groupName": "Wants",
+      "sortOrder": 1024,
+      "key": "Wants / Dining"
+    },
+    {
+      "id": "cat-shopping",
+      "name": "Shopping",
+      "groupId": "grp-wants",
+      "groupName": "Wants",
+      "sortOrder": 2048,
+      "key": "Wants / Shopping"
+    },
+    {
+      "id": "cat-savings",
+      "name": "Savings",
+      "groupId": "grp-savings",
+      "groupName": "Savings",
+      "sortOrder": 1024,
+      "key": "Savings / Savings"
+    },
+    {
+      "id": "cat-buffer",
+      "name": "Buffer",
+      "groupId": "grp-buffer",
+      "groupName": "Buffer",
+      "sortOrder": 1024,
+      "key": "Buffer / Buffer"
+    },
+    {
+      "id": "cat-income",
+      "name": "Income",
+      "groupId": "grp-income",
+      "groupName": "Income",
+      "sortOrder": 1024,
+      "key": "Income / Income"
+    }
+  ]
+}
