@@ -176,6 +176,8 @@ describe('nothing imports a removed licensing module', () => {
 
   function sourceFiles(dir) {
     const out = [];
+    // devtools/ is never part of the public core export (docs/OPEN_CORE.md), so a missing folder scans as empty there.
+    if (!fs.existsSync(dir)) return out;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
       const full = path.join(dir, entry.name);
