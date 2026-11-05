@@ -9,7 +9,7 @@
 
 # Base image pinned by tag plus multi-arch index digest. The tag lets Dependabot's docker
 # ecosystem bump the digest within node:24-bookworm-slim (a bare digest made it track node:latest).
-FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS build
+FROM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 # `npm ci` runs the root `prepare` script (node scripts/installHooks.js) before the rest of the
@@ -23,7 +23,7 @@ RUN npm run build
 RUN mkdir -p /app/.pro-runtime && if [ -d pro/server ]; then cp -r pro/server /app/.pro-runtime/server; fi
 
 # Same pinned digest as the build stage (node:24-bookworm-slim).
-FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS runtime
+FROM node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     BURROW_DATA_DIR=/data \
